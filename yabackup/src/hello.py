@@ -9,7 +9,9 @@ app.config['SECRET_KEY'] = 'your secret key'
 @app.route('/')
 def index():
     posts = get_posts()
-    return render_template('index.html', posts=posts)
+    hhhh = request.headers.get('X-Ingress-Path')
+    app.logger.info('hhh %s', hhhh)
+    return render_template('index.html', posts=posts, hhhh=hhhh)
 
 @app.route('/<int:post_id>')
 def post(post_id):
