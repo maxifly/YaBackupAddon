@@ -10,18 +10,20 @@ arch:
   - armv7
   - i386
 
+map:
+  - backup
+
 options:
-  beer: true
-  wine: true
-  liquor: false
-  name: "world"
-  year: 2017
+  client_id: 0
+  client_secret: 0
+  remote_path: "/ha_test"
+  schedule: "1 2 * * *"
+
 schema:
-  beer: bool
-  wine: bool
-  liquor: bool
-  name: str
-  year: int
+  client_id: str
+  client_secret: str
+  remote_path: str
+  schedule: str
 
 startup: before
 
