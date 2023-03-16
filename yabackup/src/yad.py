@@ -14,7 +14,7 @@ from yadisk.objects import TokenObject, ResourceObject
 from .classes import BackupFile
 from .constants import FILE_PATH_OPTIONS, OPTION_CLIENT_ID, OPTION_CLIENT_SECRET, URL_GET_CODE, \
     CONF_TOKEN, CONF_REFRESH_TOKEN, CONF_TOKEN_EXPIRES, FILE_PATH_TOKEN, BACKUP_PATH, OPTION_YD_PATH, \
-    REFRESH_TOKEN_DELTA, OPTION_SCHEDULE
+    REFRESH_TOKEN_DELTA, OPTION_SCHEDULE, OPTION_REMOTE_MAX_QUANTITY
 from .bkp_observer import BackupObserver, Backup, byte_to_mb
 
 TYPE_FILE = 'file'
@@ -84,7 +84,6 @@ class YaDsk:
     _token = None
     _refresh_token_value = None
     _token_expire_date = None
-    # TODO add option
     _max_remote_file_amount = 10
     _is_schedule_loaded = False
     _schedule = None
@@ -95,6 +94,7 @@ class YaDsk:
         self._client_secret = options[OPTION_CLIENT_SECRET]
         self._path = options[OPTION_YD_PATH]
         self._schedule = options[OPTION_SCHEDULE]
+        self._max_remote_file_amount = options[OPTION_REMOTE_MAX_QUANTITY]
 
 
         self._LOGGER = logger

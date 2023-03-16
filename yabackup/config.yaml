@@ -1,7 +1,8 @@
 name: "Yandex backup"
-description: "My first real add-on!"
+description: "Copy HA backup to YandexDisk"
 version: "1.0.1"
 slug: "yabackup"
+url: "https://github.com/maxifly/YaBackupAddon/tree/main/yabackup"
 init: false
 arch:
   - aarch64
@@ -17,12 +18,14 @@ options:
   client_id: 0
   client_secret: 0
   remote_path: "/ha_test"
+  remote_maximum_files_quantity: 10
   schedule: "1 2 * * *"
 
 schema:
   client_id: str
   client_secret: str
   remote_path: str
+  remote_maximum_files_quantity: "int(0,)"
   schedule: str
 
 startup: before
