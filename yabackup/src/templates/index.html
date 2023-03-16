@@ -1,12 +1,30 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>{% block title %} Welcome to FlaskBlog {% endblock %}</h1>
-    {% for post in posts %}
-        <a href="{{ url_for('post', post_id=post['id']) }}">
-            <h2>{{ post['title'] }}</h2>
-        </a>
-        <span class="badge badge-primary">{{ post['created'] }}</span>
-        <hr>
-    {% endfor %}
+<h1>{% block title %} Welcome to FlaskBlog {% endblock %}</h1>
+{% for b_file in backup_files %}
+<div class="card">
+    <div class="container">
+        <h3>{{ b_file.name }}</h3>
+        <h4>{{ b_file.date }}</h4>
+        <h5>{{ b_file.size }} MB</h5>
+        <div class="icons">
+
+{% if b_file.in_local %}
+          <img  class="icon" src="{{ [ig_path, url_for('static', filename='database.png')]|join }}">
+{% else  %}
+          <img  class="icon hidden" src="{{ [ig_path, url_for('static', filename='database.png')]|join }}">
+{% endif %}
+
+{% if b_file.in_remote %}
+          <img  class="icon" src="{{ [ig_path, url_for('static', filename='cloud.png')]|join }}">
+{% else  %}
+          <img  class="icon hidden" src="{{ [ig_path, url_for('static', filename='cloud.png')]|join }}">
+{% endif %}
+
+        </div>
+    </div>
+</div>
+
+{% endfor %}
 {% endblock %}
