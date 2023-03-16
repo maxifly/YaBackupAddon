@@ -105,7 +105,6 @@ def upload():
     ig_path = get_prefix()
     _LOGGER.info('Upload request')
 
-    time.sleep(30)
     ya_dsk.upload_files()
     return redirect(url_for('index_ig', ig_path=ig_path))
 
