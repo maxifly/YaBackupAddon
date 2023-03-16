@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+{% block scripts %}
+<script>
+    setTimeout(() => {
+    window.location.replace("{{ url_for('upload_ig', ig_path=ig_path) }}");
+}, 2000);
+
+
+</script>
+
+{% endblock %}
+
+{% block button_scripts %}
+<script type="text/javascript">
+window.onload=setTimeout;
+
+</script>
+
+{% endblock %}
+<div class="card">
+    <div class="container">
+        <img class="icon" src="{{ [ig_path, url_for('static', filename='in_progress.gif')]|join }}">
+    </div>
+</div>
+
+
+{% endblock %}
