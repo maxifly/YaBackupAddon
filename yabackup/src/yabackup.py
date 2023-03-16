@@ -43,8 +43,8 @@ ya_dsk = YaDsk(_LOGGER)
 @app.route('/')
 def index():
     ig_path = get_prefix()
-    _LOGGER.info('Root request');
-    _LOGGER.debug('Prefix: s', ig_path)
+    _LOGGER.info('Root request')
+    _LOGGER.debug('Prefix: %s', ig_path)
     if not ya_dsk.ensure_token():
         flash("Token does not exists")
 
