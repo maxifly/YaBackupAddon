@@ -4,10 +4,10 @@ FROM $BUILD_FROM
 # Install requirements for add-on
 RUN apk upgrade
 
-RUN apk add --no-cache git 
-RUN apk add --no-cache supervisor 
 RUN apk add --no-cache python3 
 RUN apk add --no-cache py3-pip
+RUN apk add --no-cache git 
+RUN apk add --no-cache supervisor 
 
 RUN apk upgrade
 
