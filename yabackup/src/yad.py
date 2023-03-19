@@ -2,8 +2,7 @@ import json
 import logging
 import datetime
 import time
-from typing import Generator
-
+from typing import Generator, Dict
 
 import yadisk as yadisk
 from crontab import CronTab
@@ -48,7 +47,7 @@ def get_remote_file_name_from_local(local_file: Backup):
     return (local_file.name + '_' + local_file.slug).replace(" ", "-").replace(":", "_")
 
 
-def intersect_files(local_files: dict[str, Backup], remote_files: [ResourceObject]) -> [BackupFile]:
+def intersect_files(local_files: Dict[str, Backup], remote_files: [ResourceObject]) -> [BackupFile]:
     """ Intersect information from local and remote backup files """
     fmt = "%Y-%m-%d %H:%M:%S %Z"
 
@@ -269,7 +268,7 @@ class YaDsk:
 
         return new_files or is_deleted
 
-    def get_local_file_path_list(self, backups: dict[str, Backup]):
+    def get_local_file_path_list(self, backups: Dict[str, Backup]):
         """ Convert name home assistant backups to remote backups"""
 
         result = {}
