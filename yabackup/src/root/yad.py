@@ -17,6 +17,7 @@ from .constants import FILE_PATH_OPTIONS, OPTION_CLIENT_ID, OPTION_CLIENT_SECRET
 from .bkp_observer import BackupObserver, Backup, byte_to_mb
 
 TYPE_FILE = 'file'
+CRON_LOG_FILE = '/app/cron.log'
 
 
 def read_options():
@@ -68,7 +69,8 @@ def intersect_files(local_files: Dict[str, Backup], remote_files: [ResourceObjec
     for remote_file in remote_files:
         if remote_file.name in remote_file_processed:
             continue
-        result_file = BackupFile('', remote_file.name, remote_file.modified.strftime(fmt), str(byte_to_mb(remote_file.size)), False, True)
+        result_file = BackupFile('', remote_file.name, remote_file.modified.strftime(fmt),
+                                 str(byte_to_mb(remote_file.size)), False, True)
         result.append(result_file)
 
     result.sort(key=lambda b: b.date, reverse=True)
@@ -94,7 +96,6 @@ class YaDsk:
         self._path = options[OPTION_YD_PATH]
         self._schedule = options[OPTION_SCHEDULE]
         self._max_remote_file_amount = options[OPTION_REMOTE_MAX_QUANTITY]
-
 
         self._LOGGER = logger
         self._LOGGER.info('Create YaDsk')
@@ -146,7 +147,10 @@ class YaDsk:
         cron.write()
 
         # Write new task
-        job = cron.new(command='curl localhost:8099/upload1', comment='upload')
+        # job = cron.new(command='curl localhost:8099/upload1', comment='upload')
+        job = cron.new(
+            command='echo >> ' + CRON_LOG_FILE + ';date >> ' + CRON_LOG_FILE + ';curl localhost:8099/upload1 >> ' + CRON_LOG_FILE,
+            comment='upload')
         job.setall(self._schedule)
         cron.write()
 
@@ -226,7 +230,10 @@ class YaDsk:
 
     def _refresh_token_if_need(self, delta: datetime.timedelta):
         """ Refresh token when token lifetime go out bound """
-        if (datetime.datetime.now() + delta) > self._token_expire_date:
+        self.load_token()
+        bound_date = datetime.datetime.now() + delta
+        self._LOGGER.info("Token expire date %s, bound date %s",self._token_expire_date, bound_date)
+        if self._token_expire_date is None or bound_date > self._token_expire_date:
             self._LOGGER.debug("Need refresh token")
             self._refresh_token_request(self._refresh_token_value, self._client_id, self._client_secret)
         else:

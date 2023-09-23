@@ -4,8 +4,8 @@ from pathlib import Path
 
 from yadisk.objects import ResourceObject
 
-from yabackup.src.bkp_observer import Backup
-from yabackup.src.yad import intersect_files
+from yabackup.src.root.bkp_observer import Backup
+from yabackup.src.root.yad import intersect_files
 
 
 class SquareEqSolverTestCase(unittest.TestCase):
