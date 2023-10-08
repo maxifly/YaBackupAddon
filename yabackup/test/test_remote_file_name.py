@@ -2,8 +2,8 @@ import unittest
 import datetime
 from pathlib import Path
 
-from yabackup.src.bkp_observer import Backup
-from yabackup.src.yad import get_remote_file_name_from_local
+from yabackup.src.root.bkp_observer import Backup
+from yabackup.src.root.yad import get_remote_file_name_from_local
 
 
 class SquareEqSolverTestCase(unittest.TestCase):
