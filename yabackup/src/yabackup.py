@@ -34,6 +34,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
 _LOGGER = app.logger
 ya_dsk = YaDsk(_LOGGER)
+ya_dsk.load_schedule()
 
 
 @app.route('/')
@@ -43,8 +44,6 @@ def index():
     _LOGGER.debug('Prefix: %s', ig_path)
     if not ya_dsk.ensure_token():
         flash("Token does not exists")
-
-    ya_dsk.load_schedule()
 
     backup_files = ya_dsk.get_files_info()
 
