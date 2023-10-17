@@ -6,3 +6,5 @@ Use uwsgi
 Add cron.log
 ## 1.2.1
 Improve crontab initialization
+## 1.2.2
+Use internal Flask wsgi server, because uWSGI not work properly with haos
