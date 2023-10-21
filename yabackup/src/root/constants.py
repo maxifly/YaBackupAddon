@@ -10,6 +10,7 @@ OPTION_CLIENT_SECRET = 'client_secret'
 OPTION_YD_PATH = 'remote_path'
 OPTION_SCHEDULE = 'schedule'
 OPTION_REMOTE_MAX_QUANTITY = 'remote_maximum_files_quantity'
+OPTION_LOG_LEVEL='log_level'
 
 URL_GET_CODE = 'https://oauth.yandex.ru/authorize?response_type=code&client_id='
 URL_GET_TOKEN = 'https://oauth.yandex.ru/token'

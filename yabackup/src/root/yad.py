@@ -98,8 +98,8 @@ class YaDsk:
         self._max_remote_file_amount = options[OPTION_REMOTE_MAX_QUANTITY]
 
         self._LOGGER = logger
-        self._LOGGER.info('Create YaDsk')
-        self._LOGGER.info('options: %s ', str(options))
+        self._LOGGER.critical('Create YaDsk. (It''s not a critical message)')
+        self._LOGGER.debug('options: %s ', str(options))
 
         self._backup_observer = BackupObserver(logger, BACKUP_PATH)
 
