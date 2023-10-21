@@ -28,6 +28,12 @@
         <li>
             <a href="{{url_for('get_token_ig', ig_path=ig_path)}}">Get new token</a>
         </li>
+        <li>
+            <a href="{{url_for('download_log_ig', ig_path=ig_path, filename='flask.log')}}">Download log</a>
+        </li>
+        <li>
+            <a href="{{url_for('download_log_ig', ig_path=ig_path, filename='cron.log')}}">Download cron log</a>
+        </li>
     </ul>
 </nav>
 

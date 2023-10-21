@@ -1,7 +1,10 @@
-from flask import Flask, render_template, request, flash, redirect, url_for
+from flask import Flask, render_template, request, flash, redirect, url_for, send_from_directory
 from logging.config import dictConfig
 
-from .root.yad import YaDsk
+from .root.constants import OPTION_LOG_LEVEL
+from .root.yad import YaDsk, read_options
+
+log_level = read_options().get(OPTION_LOG_LEVEL, "INFO")
 
 dictConfig(
     {
@@ -25,7 +28,7 @@ dictConfig(
                 "level": "DEBUG"
             }
         },
-        "root": {"level": "DEBUG", "handlers": ["console", "file"]},
+        "root": {"level": log_level, "handlers": ["console", "file"]},
 
     }
 )
@@ -106,6 +109,20 @@ def upload():
 
 @app.route('/<ig_path>/upload1')
 def upload_ig(ig_path):
+    pass
+
+
+@app.route('/download/log')
+def download_log():
+    ig_path = get_prefix()
+    _LOGGER.info('Download log request')
+    filename = request.args.get('filename')
+    return send_from_directory("/app", filename)
+    # return redirect(url_for('index_ig', ig_path=ig_path))
+
+
+@app.route('/<ig_path>/download/log')
+def download_log_ig(ig_path):
     pass
 
 
