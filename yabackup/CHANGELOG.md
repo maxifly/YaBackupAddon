@@ -10,3 +10,5 @@ Improve crontab initialization
 Use internal Flask wsgi server, because uWSGI not work properly with haos
 ## 1.2.3
 Add download log methods
+## 1.2.4
+Improve exception processing

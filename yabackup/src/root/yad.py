@@ -202,6 +202,12 @@ class YaDsk:
 
         return intersect_files(local_files, remote_files)
 
+    def get_local_files_info_only(self):
+        """ Get data about local backup files only"""
+        local_files = self._backup_observer.get_backups()
+
+        return intersect_files(local_files, [])
+
     def _list_yandex_disk(self) -> [ResourceObject]:
         """ List yandex disk directory.
         """
