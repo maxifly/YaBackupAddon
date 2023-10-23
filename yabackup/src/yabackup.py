@@ -48,7 +48,17 @@ def index():
     if not ya_dsk.ensure_token():
         flash("Token does not exists")
 
-    backup_files = ya_dsk.get_files_info()
+    backup_files = []
+    try:
+        backup_files = ya_dsk.get_files_info()
+    except Exception as e:
+        flash("Get files list exception " + str(e))
+
+    if len(backup_files) == 0:
+        try:
+            backup_files = ya_dsk.get_local_files_info_only()
+        except Exception as e:
+            flash("Get local files list exception " + str(e))
 
     return render_template('index.html', backup_files=backup_files, ig_path=ig_path)
 
