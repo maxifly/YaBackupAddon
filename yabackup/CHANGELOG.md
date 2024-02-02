@@ -1,6 +1,7 @@
 # Changelog
 ## 2.0.0
 Rewrite addon from python to go
+You must get new token
 ## 1.2.4
 Improve exception processing
 ## 1.2.3
