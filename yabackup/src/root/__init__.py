@@ -1,1 +1,0 @@
-"""YaBackupAddon root package"""

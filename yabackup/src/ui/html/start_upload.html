@@ -1,0 +1,29 @@
+{{template "base" .}}
+{{define "title"}}<h1>Upload</h1>{{end}}
+{{define "scripts"}}
+<script>
+    setTimeout(() => {
+        window.location.replace("upload1");
+    }, 2000);
+
+
+</script>
+
+{{end}}
+
+{{define "bottom_scripts"}}
+<script type="text/javascript">
+    window.onload=setTimeout;
+
+</script>
+{{end}}
+
+{{define "main"}}
+<!--<div class="card">-->
+    <div class="container">
+        <img class="icon" src="static/in_progress.gif">
+    </div>
+<!--</div>-->
+
+
+{{end}}

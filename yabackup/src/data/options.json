@@ -1,0 +1,8 @@
+{
+  "client_id": "859eee7fe42742f485c982b813646431",
+  "client_secret": "4434d58aa29141529ddd9fd6193caf4e",
+  "remote_path": "TestWithAppFolder",
+  "remote_maximum_files_quantity": 10,
+  "schedule": "*/3 * * * *",
+  "log_level": "DEBUG"
+}

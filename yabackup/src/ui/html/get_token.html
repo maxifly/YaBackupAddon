@@ -1,0 +1,28 @@
+{{template "base" .}}
+{{define "scripts"}}{{end}}
+{{define "title"}}
+       <h2>Follow this
+        <a href="{{ .CheckCodeUrl }}" target="_blank">
+            link
+        </a>
+        and get check code</h2>
+{{end}}
+
+{{define "main"}}
+
+<form method="post">
+    <div class="form">
+      <div class="input-container ic1">
+        <input id="check_code" name="check_code" class="input" type="text" placeholder=" "/>
+        <div class="cut"></div>
+        <label for="check_code" class="placeholder">Check code</label>
+      </div>
+      <button type="submit" class="submit">submit</button>
+    </div>
+</form>
+
+
+
+{{end}}
+
+{{define "bottom_scripts"}}{{end}}
