@@ -25,6 +25,7 @@ type ApplOptions struct {
 	RemoteMaximumFilesQuantity int    `json:"remote_maximum_files_quantity"`
 	Schedule                   string `json:"schedule"`
 	LogLevel                   string `json:"log_level"`
+	Theme                      string `json:"theme" default:"Light"`
 }
 
 type Application struct {
@@ -40,16 +41,22 @@ type AlertMessage struct {
 	Message string
 }
 type BackupResponse struct {
+	IsDarkTheme   bool
 	AlertMessages []AlertMessage
 	BFiles        []BackupFileInfo
 }
 
 type GetTokenResponse struct {
+	IsDarkTheme   bool
 	AlertMessages []AlertMessage
 	CheckCodeUrl  string
 }
 type StartUploadResponse struct {
 	AlertMessages []AlertMessage
+}
+
+func (ao *ApplOptions) IsUseDarkTheme() bool {
+	return ao.Theme == "Dark"
 }
 
 func (app *Application) indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +86,7 @@ func (app *Application) indexHandler(w http.ResponseWriter, r *http.Request) {
 		alertMessages = append(alertMessages, AlertMessage{Message: err.Error()})
 	}
 
-	data := BackupResponse{BFiles: filesInfo, AlertMessages: alertMessages}
+	data := BackupResponse{BFiles: filesInfo, AlertMessages: alertMessages, IsDarkTheme: app.options.IsUseDarkTheme()}
 
 	err = ts.Execute(w, data)
 	if err != nil {
@@ -111,7 +118,7 @@ func (app *Application) renderTokenForm(w http.ResponseWriter, r *http.Request, 
 		alertMessages = append(alertMessages, AlertMessage{Message: errorMessage})
 	}
 
-	data := GetTokenResponse{CheckCodeUrl: GetCheckCodeUrl(app.options.ClientId), AlertMessages: alertMessages}
+	data := GetTokenResponse{CheckCodeUrl: GetCheckCodeUrl(app.options.ClientId), AlertMessages: alertMessages, IsDarkTheme: app.options.IsUseDarkTheme()}
 	err = ts.Execute(w, data)
 	if err != nil {
 		app.errorLog.Println(err.Error())
@@ -162,7 +169,7 @@ func (app *Application) startUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	alertMessages := make([]AlertMessage, 0)
-	data := GetTokenResponse{CheckCodeUrl: GetCheckCodeUrl(app.options.ClientId), AlertMessages: alertMessages}
+	data := GetTokenResponse{CheckCodeUrl: GetCheckCodeUrl(app.options.ClientId), AlertMessages: alertMessages, IsDarkTheme: app.options.IsUseDarkTheme()}
 
 	err = ts.Execute(w, data)
 	if err != nil {

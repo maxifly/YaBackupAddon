@@ -1,4 +1,8 @@
 # Changelog
+## 2.0.1
+- Add dark theme. Change config (add configuration parameter. May be need full reinstall). [#8](https://github.com/maxifly/YaBackupAddon/issues/8)
+
+- Change readme. [#9](https://github.com/maxifly/YaBackupAddon/issues/9) 
 ## 2.0.0
 Rewrite addon from python to go
 You must get new token

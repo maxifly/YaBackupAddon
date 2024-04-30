@@ -12,14 +12,14 @@
         <h5>{{ .GeneralInfo.Size.Convert2MbString }} MB</h5>
         <div class="icons">
             {{if .IsLocal}}
-            <img class="icon" src="static/database.png">
+            <img class="icon database">
             {{else}}
-            <img class="icon hidden" src="static/database.png">
+            <img class="icon database hidden">
             {{end}}
             {{if .IsRemote}}
-            <img class="icon" src="static/cloud.png">
+            <img class="icon cloud">
             {{else}}
-            <img class="icon hidden" src="static/cloud.png">
+            <img class="icon cloud hidden">
             {{end}}
         </div>
     </div>

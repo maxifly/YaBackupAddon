@@ -8,9 +8,20 @@
 
     <!-- Bootstrap CSS -->
     <!--    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">-->
+    {{if .IsDarkTheme}}
+    <link rel="stylesheet" type="text/css" href="static/main_dark.css">
+    {{else}}
     <link rel="stylesheet" type="text/css" href="static/main.css">
+    {{end}}
+
+    <link rel="stylesheet" type="text/css" href="static/menu.css">
     <link rel="stylesheet" type="text/css" href="static/form.css">
+
+    {{if .IsDarkTheme}}
+    <link rel="stylesheet" type="text/css" href="static/card_dark.css">
+    {{else}}
     <link rel="stylesheet" type="text/css" href="static/card.css">
+    {{end}}
 
     {{template "scripts" .}}
 
