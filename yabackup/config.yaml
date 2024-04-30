@@ -1,6 +1,6 @@
 name: "Yandex backup"
 description: "Copy HA backup to YandexDisk"
-version: "2.0.0"
+version: "2.0.1"
 slug: "yabackup"
 url: "https://github.com/maxifly/YaBackupAddon/tree/main/yabackup"
 init: false
@@ -21,6 +21,7 @@ options:
   remote_maximum_files_quantity: 10
   schedule: "1 2 * * *"
   log_level: INFO
+  theme: Light
 
 schema:
   client_id: str
@@ -29,6 +30,7 @@ schema:
   remote_maximum_files_quantity: "int(0,)"
   schedule: str
   log_level: "list(DEBUG|INFO|WARNING|ERROR)"
+  theme: "list(Light|Dark)"
 
 startup: before
 

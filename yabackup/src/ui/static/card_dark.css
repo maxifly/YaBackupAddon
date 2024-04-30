@@ -1,5 +1,5 @@
 .card {
-  box-shadow: 0 1px 2px 0 rgba(0,50,100,1);
+  box-shadow: 0 1px 2px 0 rgba(200,255,255,1);
   transition: 0.3s;
   width: 100%;
   margin: 15px;
@@ -22,11 +22,11 @@
 }
 
 .icon.database{
-  content: url("database.png");
+  content: url("database_dark.png");
 }
 
 .icon.cloud{
-  content: url("cloud.png");
+  content: url("cloud_dark.png");
 }
 
 .icon.database.hidden{
