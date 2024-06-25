@@ -1,0 +1,34 @@
+name: Create and publish a Docker image to GitHub
+
+on:
+  workflow_dispatch:
+#  push:
+#    branches: ['test']
+env:
+  GIT_TAG_NAME: dev
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3.2.0
+        with:
+          registry: ghcr.io
+          username: maxifly
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: home-assistant/builder@master
+        with:
+          args: |
+            --all \
+            --target ./yabackup \
+            --docker-hub ghcr.io/maxifly/yabackupaddon \
+            --addon \
+            --no-cache
+
+#          tags: ${{ env.REGISTRY }}/pradumnasaraf/hello-world:latest
+#          labels: ${{ steps.meta.outputs.labels }}
