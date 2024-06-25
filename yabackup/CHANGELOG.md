@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.2b
+- Use prebuild docker image. [#10](https://github.com/maxifly/YaBackupAddon/issues/10)
+
 ## 2.0.1
 - Add dark theme. Change config (add configuration parameter. May be need full reinstall). [#8](https://github.com/maxifly/YaBackupAddon/issues/8)
 
