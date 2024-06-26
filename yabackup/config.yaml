@@ -3,7 +3,7 @@ description: "Copy HA backup to YandexDisk"
 version: "2.0.2-b"
 slug: "yabackup"
 url: "https://github.com/maxifly/YaBackupAddon/tree/main/yabackup"
-image: "ghcr.io/maxifly/yabackup-{arch}"
+image: "ghcr.io/maxifly/yabackupaddon/yabackup-{arch}"
 init: false
 arch:
   - aarch64
