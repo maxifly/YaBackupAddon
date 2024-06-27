@@ -1,5 +1,5 @@
 # Changelog
-## 2.0.2b
+## 2.0.2
 - Use prebuild docker image. [#10](https://github.com/maxifly/YaBackupAddon/issues/10)
 
 ## 2.0.1
