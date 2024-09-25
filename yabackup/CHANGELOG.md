@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.3
+- Up upload-big-file library version [#12](https://github.com/maxifly/YaBackupAddon/issues/12)
+
 ## 2.0.2
 - Use prebuild docker image. [#10](https://github.com/maxifly/YaBackupAddon/issues/10)
 

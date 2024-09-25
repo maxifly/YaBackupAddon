@@ -5,7 +5,7 @@ replace github.com/nikitaksv/yandex-disk-sdk-go v1.0.3 => github.com/maxifly/yan
 require (
 	github.com/go-co-op/gocron/v2 v2.2.1
 	github.com/gorilla/mux v1.8.1
-	github.com/maxifly/upload-big-file v1.0.0
+	github.com/maxifly/upload-big-file v1.0.1
 	github.com/nikitaksv/yandex-disk-sdk-go v1.0.3
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/oauth2 v0.14.0
