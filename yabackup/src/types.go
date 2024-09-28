@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"log"
+	"time"
+)
 
 type fileSize int64
 type fileModified time.Time
@@ -45,4 +48,10 @@ type ForUploadFileInfo struct {
 type ForDeleteFileInfo struct {
 	RemoteFileName string
 	MD5            string
+}
+
+type Logger struct {
+	ErrorLog *log.Logger
+	InfoLog  *log.Logger
+	DebugLog *log.Logger
 }
