@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 )
 
 const (
 	BaseURL  string = "http://supervisor/core/api"
-	EntityId string = "yba_test"
+	EntityId string = "sensor.yba_test"
 )
 
 type HA_API_CLIENT struct {
@@ -80,6 +81,7 @@ func (haApi *HA_API_CLIENT) setEntityState(entityState EntityState) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
 
+	haApi.logger.DebugLog.Printf("Send request %v", req)
 	// Отправляем запрос
 	resp, err := haApi.httpClient.Do(req)
 	if err != nil {
@@ -90,10 +92,15 @@ func (haApi *HA_API_CLIENT) setEntityState(entityState EntityState) error {
 	defer resp.Body.Close()
 
 	// Проверяем статус ответа
-	haApi.logger.DebugLog.Printf("Request result %v", resp.Body)
-	haApi.logger.InfoLog.Printf("http response %v", resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		haApi.logger.ErrorLog.Println("Ошибка при чтении ответа: %v", err)
+	}
+
+	haApi.logger.DebugLog.Printf("Request result %d: %s", resp.StatusCode, body)
+
 	if resp.StatusCode >= 400 {
-		resultError := fmt.Errorf("request perform with error: %v", resp.StatusCode)
+		resultError := fmt.Errorf("request perform with error: %d and body %s", resp.StatusCode, body)
 		haApi.logger.ErrorLog.Println(resultError)
 		return resultError
 	}

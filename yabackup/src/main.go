@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-co-op/gocron/v2"
@@ -32,9 +33,11 @@ type Application struct {
 	errorLog  *log.Logger
 	infoLog   *log.Logger
 	debugLog  *log.Logger
+	logger    *Logger
 	options   ApplOptions
 	tokenInfo TokenInfo
 	yaDisk    *yadisk.YaDisk
+	haApi     *HA_API_CLIENT
 }
 
 type AlertMessage struct {
@@ -186,6 +189,14 @@ func (app *Application) upload1(w http.ResponseWriter, r *http.Request) {
 }
 
 func UploadTask(app *Application) {
+	//Test
+	err := app.haApi.setEntityState(EntityState{state: "okok",
+		attrV1: "v1",
+		attrV2: "v2,"})
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when change entity state. %v", err)
+	}
+	//Test
 	app.refreshTokenIsNeed()
 	filesInfo, err := GetFilesInfo(app)
 	if err != nil {
@@ -236,6 +247,23 @@ func (app *Application) ensureTokenInfo() {
 			return
 		}
 		app.tokenInfo = token
+	}
+}
+
+func (app *Application) ensureHaApiClient() {
+	if app.haApi == nil {
+		supervisorToken := os.Getenv("SUPERVISOR_TOKEN")
+		if supervisorToken == "" {
+			app.logger.ErrorLog.Println("Supervisor token not found")
+			return
+		}
+
+		api, err := NewHaApi(context.Background(), http.DefaultClient, supervisorToken, app.logger)
+		if err != nil {
+			app.logger.ErrorLog.Printf("Errorl when create ha_api client: %v", err)
+			return
+		}
+		app.haApi = api
 	}
 }
 
@@ -311,11 +339,16 @@ func main() {
 	errorLog.Println("hello")
 
 	// Инициализируем новую структуру с зависимостями приложения.
+	logger := Logger{ErrorLog: errorLog,
+		InfoLog:  infoLog,
+		DebugLog: debugLog}
+
 	app := &Application{
 		options:  options,
 		errorLog: errorLog,
 		infoLog:  infoLog,
 		debugLog: debugLog,
+		logger:   &logger,
 	}
 
 	router := mux.NewRouter()
@@ -335,6 +368,7 @@ func main() {
 	app.ensureTokenInfo()
 	app.refreshTokenIsNeed()
 	app.ensureYandexDisk()
+	app.ensureHaApiClient()
 
 	scheduler, err := gocron.NewScheduler(gocron.WithLocation(time.UTC),
 		gocron.WithLogger(
