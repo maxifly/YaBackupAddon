@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 const (
@@ -15,17 +16,80 @@ const (
 	EntityId string = "sensor.yba_test"
 )
 
-type HA_API_CLIENT struct {
+type HaApiClient struct {
 	ctx        context.Context
 	httpClient *http.Client
 	token      string
 	logger     *Logger
 }
 
+// Status Определяем Enum для статуса
+type Status int
+
+const (
+	OK Status = iota
+	ERROR
+)
+
+// Метод для возврата строкового представления статуса
+func (s Status) String() string {
+	return [...]string{"ok", "error"}[s]
+}
+
+// MarshalJSON Метод для сериализации статуса в JSON
+func (s Status) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+// UnmarshalJSON Метод для десериализации статуса из JSON
+func (s *Status) UnmarshalJSON(data []byte) error {
+	var statusString string
+	if err := json.Unmarshal(data, &statusString); err != nil {
+		return err
+	}
+
+	// Переводим строку обратно в Enum
+	switch statusString {
+	case "ok":
+		*s = OK
+	case "error":
+		*s = ERROR
+	default:
+		return fmt.Errorf("unknown status: %s", statusString)
+	}
+	return nil
+}
+
 type EntityState struct {
-	state  string
+	state  Status
 	attrV1 string
 	attrV2 string
+}
+
+// CustomTime - пользовательский тип, оборачивающий time.Time
+type CustomTime struct {
+	time.Time
+}
+
+// MarshalJSON - пользовательская сериализация для CustomTime
+func (c CustomTime) MarshalJSON() ([]byte, error) {
+	// Здесь указываем нужный формат
+	return json.Marshal(c.Time.Format(time.RFC3339Nano))
+}
+
+// UnmarshalJSON - пользовательская десериализация для CustomTime
+func (c *CustomTime) UnmarshalJSON(data []byte) error {
+	// Десериализация строки в формат времени
+	var timeStr string
+	if err := json.Unmarshal(data, &timeStr); err != nil {
+		return err
+	}
+	t, err := time.Parse(time.RFC3339Nano, timeStr)
+	if err != nil {
+		return err
+	}
+	c.Time = t
+	return nil
 }
 
 // Определяем структуру, соответствующую JSON объекту
@@ -36,19 +100,19 @@ type EntityAttributes struct {
 }
 
 type SetEntityStateRequest struct {
-	State      string           `json:"state"`
+	State      Status           `json:"state"`
 	Attributes EntityAttributes `json:"attributes"`
 }
 
-func NewHaApi(ctx context.Context, client *http.Client, token string, logger *Logger) (*HA_API_CLIENT, error) {
+func NewHaApi(ctx context.Context, client *http.Client, token string, logger *Logger) (*HaApiClient, error) {
 	if token == "" {
 		return nil, errors.New("required token")
 	}
 
-	return &HA_API_CLIENT{ctx: ctx, httpClient: client, token: token, logger: logger}, nil
+	return &HaApiClient{ctx: ctx, httpClient: client, token: token, logger: logger}, nil
 }
 
-func (haApi *HA_API_CLIENT) setEntityState(entityState EntityState) error {
+func (haApi *HaApiClient) setEntityState(entityState EntityState) error {
 	haApi.logger.DebugLog.Println("Set entity request")
 	url := fmt.Sprintf("%s/states/%s", BaseURL, EntityId)
 

@@ -37,7 +37,7 @@ type Application struct {
 	options   ApplOptions
 	tokenInfo TokenInfo
 	yaDisk    *yadisk.YaDisk
-	haApi     *HA_API_CLIENT
+	haApi     *HaApiClient
 }
 
 type AlertMessage struct {
@@ -260,7 +260,7 @@ func (app *Application) ensureHaApiClient() {
 
 		api, err := NewHaApi(context.Background(), http.DefaultClient, supervisorToken, app.logger)
 		if err != nil {
-			app.logger.ErrorLog.Printf("Errorl when create ha_api client: %v", err)
+			app.logger.ErrorLog.Printf("Error when create ha_api client: %v", err)
 			return
 		}
 		app.haApi = api
