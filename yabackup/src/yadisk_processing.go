@@ -7,6 +7,7 @@ import (
 	yadisk "github.com/nikitaksv/yandex-disk-sdk-go"
 	"net/http"
 	"time"
+	"ybg/internal/types"
 )
 
 const itemTypeFile string = "file"
@@ -18,12 +19,12 @@ func NewYandexDisk(accessToken string) (yadisk.YaDisk, error) {
 
 }
 
-func getRemoteFiles(app *Application) ([]RemoteFileInfo, error) {
+func getRemoteFiles(app *Application) ([]types.RemoteFileInfo, error) {
 	app.infoLog.Printf("%v", app.options.RemotePath)
 	if app.yaDisk == nil {
 		return nil, fmt.Errorf("YandexDisk object is nil")
 	}
-	result := make([]RemoteFileInfo, 0)
+	result := make([]types.RemoteFileInfo, 0)
 
 	resource, err := (*app.yaDisk).GetResource(app.options.RemotePath, make([]string, 0), 10000, 0, false, "0", "name")
 	if err != nil {
@@ -43,9 +44,9 @@ func getRemoteFiles(app *Application) ([]RemoteFileInfo, error) {
 			app.errorLog.Printf("Can not parse data %s %v", item.Modified, err)
 			modifyedTime = minTime
 		}
-		result = append(result, RemoteFileInfo{Name: item.Name,
-			Size:     fileSize(item.Size),
-			Modified: fileModified(modifyedTime)})
+		result = append(result, types.RemoteFileInfo{Name: item.Name,
+			Size:     types.FileSize(item.Size),
+			Modified: types.FileModified(modifyedTime)})
 
 	}
 
@@ -69,7 +70,7 @@ func uploadFile(app *Application, source string, destination string) error {
 		ErrorLog: app.errorLog,
 	}
 
-	uploader := uploadbig.New(PUT, link.Href, source, httpClient, int(MiB), &logger)
+	uploader := uploadbig.New(types.PUT, link.Href, source, httpClient, int(types.MiB), &logger)
 
 	err = uploader.Init()
 	if err != nil {

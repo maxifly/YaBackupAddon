@@ -11,24 +11,25 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"ybg/internal/types"
 )
 
-func GetFilesInfo(application *Application) ([]BackupFileInfo, error) {
+func GetFilesInfo(application *Application) ([]types.BackupFileInfo, error) {
 	application.debugLog.Println("Start get files")
 	application.debugLog.Printf("Token expiry %v", application.tokenInfo.Expiry)
 	remoteFiles, err := getRemoteFiles(application)
 	if err != nil {
-		return make([]BackupFileInfo, 0), err
+		return make([]types.BackupFileInfo, 0), err
 	}
 	localFiles, err := getLocalBackupFiles(application)
 	if err != nil {
-		return make([]BackupFileInfo, 0), err
+		return make([]types.BackupFileInfo, 0), err
 	}
 
 	return intersectFiles(application, localFiles, remoteFiles)
 }
 
-func UploadFiles(app *Application, files []ForUploadFileInfo) error {
+func UploadFiles(app *Application, files []types.ForUploadFileInfo) error {
 	sort.Slice(files, func(i, j int) bool {
 		return time.Time(files[i].LocalFileInfo.Modified).Before(time.Time(files[j].LocalFileInfo.Modified))
 	})
@@ -51,7 +52,7 @@ func UploadFiles(app *Application, files []ForUploadFileInfo) error {
 	return nil
 }
 
-func DeleteFiles(app *Application, files []ForDeleteFileInfo) error {
+func DeleteFiles(app *Application, files []types.ForDeleteFileInfo) error {
 	isError := false
 	//TODO Add real Md5
 	for _, file := range files {
@@ -69,11 +70,11 @@ func DeleteFiles(app *Application, files []ForDeleteFileInfo) error {
 	return nil
 }
 
-func ChooseFilesToUpload(app *Application, files []BackupFileInfo) []ForUploadFileInfo {
-	result := make([]ForUploadFileInfo, 0)
+func ChooseFilesToUpload(app *Application, files []types.BackupFileInfo) []types.ForUploadFileInfo {
+	result := make([]types.ForUploadFileInfo, 0)
 	for _, file := range files {
 		if file.IsLocal && !file.IsRemote {
-			result = append(result, ForUploadFileInfo{
+			result = append(result, types.ForUploadFileInfo{
 				LocalFileInfo:  file.GeneralInfo,
 				RemoteFileName: file.RemoteFileName,
 			})
@@ -83,9 +84,9 @@ func ChooseFilesToUpload(app *Application, files []BackupFileInfo) []ForUploadFi
 	return result
 }
 
-func ChooseFilesToDelete(app *Application, files []BackupFileInfo, uploadFileCount int) []ForDeleteFileInfo {
-	result := make([]ForDeleteFileInfo, 0)
-	remoteFiles := make([]BackupFileInfo, 0)
+func ChooseFilesToDelete(app *Application, files []types.BackupFileInfo, uploadFileCount int) []types.ForDeleteFileInfo {
+	result := make([]types.ForDeleteFileInfo, 0)
+	remoteFiles := make([]types.BackupFileInfo, 0)
 	for _, file := range files {
 		if file.IsRemote {
 			remoteFiles = append(remoteFiles, file)
@@ -106,7 +107,7 @@ func ChooseFilesToDelete(app *Application, files []BackupFileInfo, uploadFileCou
 	})
 
 	for _, file := range remoteFiles {
-		result = append(result, ForDeleteFileInfo{RemoteFileName: file.RemoteFileName, MD5: ""})
+		result = append(result, types.ForDeleteFileInfo{RemoteFileName: file.RemoteFileName, MD5: ""})
 		fileAmount--
 		if app.options.RemoteMaximumFilesQuantity >= fileAmount {
 			break
@@ -120,8 +121,8 @@ func ChooseFilesToDelete(app *Application, files []BackupFileInfo, uploadFileCou
 type stringSet map[string]bool
 
 func intersectFiles(app *Application,
-	localFiles map[string]LocalBackupFileInfo,
-	remoteFiles []RemoteFileInfo) ([]BackupFileInfo, error) {
+	localFiles map[string]types.LocalBackupFileInfo,
+	remoteFiles []types.RemoteFileInfo) ([]types.BackupFileInfo, error) {
 
 	remoteFileNames := make(stringSet)
 	processedRemoteFile := make(stringSet)
@@ -130,7 +131,7 @@ func intersectFiles(app *Application,
 		remoteFileNames[remoteFile.Name] = true
 	}
 
-	result := make([]BackupFileInfo, 0, len(localFiles))
+	result := make([]types.BackupFileInfo, 0, len(localFiles))
 
 	// Обработаем локальные файлы
 	for _, localFile := range localFiles {
@@ -138,7 +139,7 @@ func intersectFiles(app *Application,
 		_, isRemote := remoteFileNames[remoteFileName]
 
 		result = append(result,
-			BackupFileInfo{
+			types.BackupFileInfo{
 				GeneralInfo:    localFile.GeneralInfo,
 				BackupName:     localFile.BackupName,
 				RemoteFileName: remoteFileName,
@@ -152,8 +153,8 @@ func intersectFiles(app *Application,
 	for _, remoteFile := range remoteFiles {
 		if _, isProcessing := processedRemoteFile[remoteFile.Name]; !isProcessing {
 			result = append(result,
-				BackupFileInfo{
-					GeneralInfo: GeneralFileInfo{
+				types.BackupFileInfo{
+					GeneralInfo: types.GeneralFileInfo{
 						Name:     remoteFile.Name,
 						Size:     remoteFile.Size,
 						Modified: remoteFile.Modified,
@@ -174,18 +175,18 @@ func intersectFiles(app *Application,
 }
 
 // localFile.CreateDate.Format("02.01.2006 15:04:05 MST"),
-func generateRemoteFileName(localFile LocalBackupFileInfo) string {
+func generateRemoteFileName(localFile types.LocalBackupFileInfo) string {
 	return strings.ReplaceAll(strings.ReplaceAll(localFile.BackupName+"_"+localFile.Slug, " ", "-"), ":", "_")
 }
 
-func getLocalBackupFiles(app *Application) (map[string]LocalBackupFileInfo, error) {
+func getLocalBackupFiles(app *Application) (map[string]types.LocalBackupFileInfo, error) {
 
 	entries, err := os.ReadDir(BACKUP_PATH)
 	if err != nil {
 		app.errorLog.Printf("Unable to read backup %s. %v", BACKUP_PATH, err)
 		return nil, fmt.Errorf("error when read local backups")
 	}
-	result := make(map[string]LocalBackupFileInfo)
+	result := make(map[string]types.LocalBackupFileInfo)
 	for _, entry := range entries {
 		app.debugLog.Printf("entry %+v", entry)
 		info, err := entry.Info()
@@ -207,7 +208,7 @@ func getLocalBackupFiles(app *Application) (map[string]LocalBackupFileInfo, erro
 			continue
 		}
 
-		result[archInfo.Slug] = LocalBackupFileInfo{
+		result[archInfo.Slug] = types.LocalBackupFileInfo{
 			GeneralInfo: convertBkFileInfoToGeneral(&info),
 			Slug:        archInfo.Slug,
 			BackupName:  archInfo.Name,
@@ -218,14 +219,14 @@ func getLocalBackupFiles(app *Application) (map[string]LocalBackupFileInfo, erro
 
 }
 
-func convertBkFileInfoToGeneral(bkFileInfo *fs.FileInfo) GeneralFileInfo {
-	return GeneralFileInfo{Name: (*bkFileInfo).Name(),
-		Size:     fileSize((*bkFileInfo).Size()),
-		Modified: fileModified((*bkFileInfo).ModTime()),
+func convertBkFileInfoToGeneral(bkFileInfo *fs.FileInfo) types.GeneralFileInfo {
+	return types.GeneralFileInfo{Name: (*bkFileInfo).Name(),
+		Size:     types.FileSize((*bkFileInfo).Size()),
+		Modified: types.FileModified((*bkFileInfo).ModTime()),
 	}
 }
 
-func extractArchInfo(app *Application, tarfile string) (*BackupArchInfo, error) {
+func extractArchInfo(app *Application, tarfile string) (*types.BackupArchInfo, error) {
 	reader, err := os.Open(tarfile)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: cannot read tar file, error=[%v]\n", err)
@@ -256,7 +257,7 @@ func extractArchInfo(app *Application, tarfile string) (*BackupArchInfo, error) 
 		if info.IsDir() || info.Name() != "backup.json" {
 			continue
 		} else {
-			var data BackupArchInfo
+			var data types.BackupArchInfo
 			plan, err := io.ReadAll(tarReader)
 
 			if err != nil {

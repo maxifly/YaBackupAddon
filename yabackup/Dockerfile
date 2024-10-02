@@ -33,7 +33,7 @@ RUN if [ "${BUILD_ARCH}" = "armhf" ]; then \
     else \
         exit 1; \
     fi \
-    && go build -o YBG
+    && go build -o ybg
 
 
 WORKDIR /app

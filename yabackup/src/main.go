@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"ybg/internal/haentity"
+	"ybg/internal/types"
 )
 
 const FILE_PATH_OPTIONS = "/data/options.json"
@@ -33,11 +35,11 @@ type Application struct {
 	errorLog  *log.Logger
 	infoLog   *log.Logger
 	debugLog  *log.Logger
-	logger    *Logger
+	logger    *types.Logger
 	options   ApplOptions
-	tokenInfo TokenInfo
+	tokenInfo types.TokenInfo
 	yaDisk    *yadisk.YaDisk
-	haApi     *HaApiClient
+	haApi     *haentity.HaApiClient
 }
 
 type AlertMessage struct {
@@ -46,7 +48,7 @@ type AlertMessage struct {
 type BackupResponse struct {
 	IsDarkTheme   bool
 	AlertMessages []AlertMessage
-	BFiles        []BackupFileInfo
+	BFiles        []types.BackupFileInfo
 }
 
 type GetTokenResponse struct {
@@ -190,9 +192,9 @@ func (app *Application) upload1(w http.ResponseWriter, r *http.Request) {
 
 func UploadTask(app *Application) {
 	//Test
-	err := app.haApi.setEntityState(EntityState{state: "okok",
-		attrV1: "v1",
-		attrV2: "v2,"})
+	err := app.haApi.SetEntityState(haentity.EntityState{State: haentity.OK,
+		AttrV1: "v1",
+		AttrV2: "v2,"})
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error when change entity state. %v", err)
 	}
@@ -258,7 +260,7 @@ func (app *Application) ensureHaApiClient() {
 			return
 		}
 
-		api, err := NewHaApi(context.Background(), http.DefaultClient, supervisorToken, app.logger)
+		api, err := haentity.NewHaApi(context.Background(), http.DefaultClient, supervisorToken, app.logger)
 		if err != nil {
 			app.logger.ErrorLog.Printf("Error when create ha_api client: %v", err)
 			return
@@ -339,7 +341,7 @@ func main() {
 	errorLog.Println("hello")
 
 	// Инициализируем новую структуру с зависимостями приложения.
-	logger := Logger{ErrorLog: errorLog,
+	logger := types.Logger{ErrorLog: errorLog,
 		InfoLog:  infoLog,
 		DebugLog: debugLog}
 

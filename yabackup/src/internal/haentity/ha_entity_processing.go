@@ -1,4 +1,4 @@
-package main
+package haentity
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"ybg/internal/types"
 )
 
 const (
@@ -20,7 +21,7 @@ type HaApiClient struct {
 	ctx        context.Context
 	httpClient *http.Client
 	token      string
-	logger     *Logger
+	logger     *types.Logger
 }
 
 // Status Определяем Enum для статуса
@@ -61,9 +62,9 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 }
 
 type EntityState struct {
-	state  Status
-	attrV1 string
-	attrV2 string
+	State  Status
+	AttrV1 string
+	AttrV2 string
 }
 
 // CustomTime - пользовательский тип, оборачивающий time.Time
@@ -104,7 +105,7 @@ type SetEntityStateRequest struct {
 	Attributes EntityAttributes `json:"attributes"`
 }
 
-func NewHaApi(ctx context.Context, client *http.Client, token string, logger *Logger) (*HaApiClient, error) {
+func NewHaApi(ctx context.Context, client *http.Client, token string, logger *types.Logger) (*HaApiClient, error) {
 	if token == "" {
 		return nil, errors.New("required token")
 	}
@@ -112,15 +113,15 @@ func NewHaApi(ctx context.Context, client *http.Client, token string, logger *Lo
 	return &HaApiClient{ctx: ctx, httpClient: client, token: token, logger: logger}, nil
 }
 
-func (haApi *HaApiClient) setEntityState(entityState EntityState) error {
+func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 	haApi.logger.DebugLog.Println("Set entity request")
 	url := fmt.Sprintf("%s/states/%s", BaseURL, EntityId)
 
 	data := SetEntityStateRequest{
-		State: entityState.state,
+		State: entityState.State,
 		Attributes: EntityAttributes{
-			NextRising:  entityState.attrV1,
-			NextSetting: entityState.attrV2,
+			NextRising:  entityState.AttrV1,
+			NextSetting: entityState.AttrV2,
 		},
 	}
 

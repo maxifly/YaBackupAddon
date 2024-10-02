@@ -1,4 +1,4 @@
-module YBG
+module ybg
 
 replace github.com/nikitaksv/yandex-disk-sdk-go v1.0.3 => github.com/maxifly/yandex-disk-sdkgo v1.0.4
 

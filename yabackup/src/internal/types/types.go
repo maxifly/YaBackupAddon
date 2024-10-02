@@ -1,12 +1,9 @@
-package main
+package types
 
 import (
 	"log"
 	"time"
 )
-
-type fileSize int64
-type fileModified time.Time
 
 type TokenInfo struct {
 	AccessToken  string    `json:"access_token"`
@@ -16,8 +13,8 @@ type TokenInfo struct {
 
 type GeneralFileInfo struct {
 	Name     string
-	Size     fileSize
-	Modified fileModified
+	Size     FileSize
+	Modified FileModified
 }
 
 type RemoteFileInfo GeneralFileInfo
