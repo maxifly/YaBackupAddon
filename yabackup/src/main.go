@@ -13,7 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	"ybg/internal/haentity"
+	"ybg/internal/haoperate"
 	"ybg/internal/types"
 )
 
@@ -39,7 +39,7 @@ type Application struct {
 	options   ApplOptions
 	tokenInfo types.TokenInfo
 	yaDisk    *yadisk.YaDisk
-	haApi     *haentity.HaApiClient
+	haApi     *haoperate.HaApiClient
 }
 
 type AlertMessage struct {
@@ -192,7 +192,7 @@ func (app *Application) upload1(w http.ResponseWriter, r *http.Request) {
 
 func UploadTask(app *Application) {
 	//Test
-	err := app.haApi.SetEntityState(haentity.EntityState{State: haentity.OK,
+	err := app.haApi.SetEntityState(haoperate.EntityState{State: haoperate.OK,
 		AttrV1: "v1",
 		AttrV2: "v2,"})
 	if err != nil {
@@ -260,7 +260,7 @@ func (app *Application) ensureHaApiClient() {
 			return
 		}
 
-		api, err := haentity.NewHaApi(context.Background(), http.DefaultClient, supervisorToken, app.logger)
+		api, err := haoperate.NewHaApi(context.Background(), http.DefaultClient, supervisorToken, app.logger)
 		if err != nil {
 			app.logger.ErrorLog.Printf("Error when create ha_api client: %v", err)
 			return
