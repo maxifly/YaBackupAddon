@@ -7,18 +7,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"ybg/internal/maintypes"
+	"ybg/internal/types"
 )
 
 func Test_extractArchInfo(t *testing.T) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
-	app := &Application{
-		options:  ApplOptions{},
-		errorLog: errorLog,
-		infoLog:  errorLog,
-		debugLog: errorLog,
+	appData := &maintypes.AppData{
+		Options: maintypes.ApplOptions{},
+		Logger: &types.Logger{ErrorLog: errorLog,
+			InfoLog:  errorLog,
+			DebugLog: errorLog},
 	}
-	info, err := extractArchInfo(app, filepath.Join("testresources", "correct_file.tar"))
+
+	info, err := extractArchInfo(appData, filepath.Join("testresources", "correct_file.tar"))
 
 	assert.Nil(t, err, "Error must be nil")
 	assert.Equal(t, "5508d5ad", info.Slug, "Slug not equal")
@@ -29,11 +32,11 @@ func Test_extractBadArchInfo(t *testing.T) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 	infoLog := log.New(os.Stderr, "INFO\t", log.Ldate|log.Ltime|log.Lshortfile)
 
-	app := &Application{
-		options:  ApplOptions{},
-		errorLog: errorLog,
-		infoLog:  infoLog,
-		debugLog: infoLog,
+	app := &maintypes.AppData{
+		Options: maintypes.ApplOptions{},
+		Logger: &types.Logger{ErrorLog: errorLog,
+			InfoLog:  infoLog,
+			DebugLog: infoLog},
 	}
 
 	type args struct {

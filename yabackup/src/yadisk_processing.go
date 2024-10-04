@@ -7,6 +7,7 @@ import (
 	yadisk "github.com/nikitaksv/yandex-disk-sdk-go"
 	"net/http"
 	"time"
+	"ybg/internal/maintypes"
 	"ybg/internal/types"
 )
 
@@ -19,20 +20,20 @@ func NewYandexDisk(accessToken string) (yadisk.YaDisk, error) {
 
 }
 
-func getRemoteFiles(app *Application) ([]types.RemoteFileInfo, error) {
-	app.infoLog.Printf("%v", app.options.RemotePath)
-	if app.yaDisk == nil {
+func getRemoteFiles(app *maintypes.AppData) ([]types.RemoteFileInfo, error) {
+	app.Logger.InfoLog.Printf("%v", app.Options.RemotePath)
+	if app.YaDisk == nil {
 		return nil, fmt.Errorf("YandexDisk object is nil")
 	}
 	result := make([]types.RemoteFileInfo, 0)
 
-	resource, err := (*app.yaDisk).GetResource(app.options.RemotePath, make([]string, 0), 10000, 0, false, "0", "name")
+	resource, err := (*app.YaDisk).GetResource(app.Options.RemotePath, make([]string, 0), 10000, 0, false, "0", "name")
 	if err != nil {
-		app.errorLog.Printf("Error when get remote files from path %s. %v", app.options.RemotePath, err)
+		app.Logger.ErrorLog.Printf("Error when get remote files from path %s. %v", app.Options.RemotePath, err)
 		return result, err
 	}
 
-	app.debugLog.Printf("Found %d remote items", len(resource.Embedded.Items))
+	app.Logger.DebugLog.Printf("Found %d remote items", len(resource.Embedded.Items))
 
 	for _, item := range resource.Embedded.Items {
 		if item.Type != itemTypeFile {
@@ -41,7 +42,7 @@ func getRemoteFiles(app *Application) ([]types.RemoteFileInfo, error) {
 
 		modifyedTime, err := convertDateString(item.Modified)
 		if err != nil {
-			app.errorLog.Printf("Can not parse data %s %v", item.Modified, err)
+			app.Logger.ErrorLog.Printf("Can not parse data %s %v", item.Modified, err)
 			modifyedTime = minTime
 		}
 		result = append(result, types.RemoteFileInfo{Name: item.Name,
@@ -50,24 +51,24 @@ func getRemoteFiles(app *Application) ([]types.RemoteFileInfo, error) {
 
 	}
 
-	app.debugLog.Printf("Processing %d remote files", len(result))
+	app.Logger.DebugLog.Printf("Processing %d remote files", len(result))
 	return result, nil
 
 }
 
-func uploadFile(app *Application, source string, destination string) error {
-	link, err := (*app.yaDisk).GetResourceUploadLink(destination, nil, true)
+func uploadFile(app *maintypes.AppData, source string, destination string) error {
+	link, err := (*app.YaDisk).GetResourceUploadLink(destination, nil, true)
 	if err != nil {
 		return err
 	}
-	app.debugLog.Printf("Get href %s", link.Href)
+	app.Logger.DebugLog.Printf("Get href %s", link.Href)
 
 	httpClient := &http.Client{}
 
 	logger := uploadbig.Logger{
-		DebugLog: app.debugLog,
-		InfoLog:  app.infoLog,
-		ErrorLog: app.errorLog,
+		DebugLog: app.Logger.DebugLog,
+		InfoLog:  app.Logger.InfoLog,
+		ErrorLog: app.Logger.ErrorLog,
 	}
 
 	uploader := uploadbig.New(types.PUT, link.Href, source, httpClient, int(types.MiB), &logger)
@@ -77,24 +78,24 @@ func uploadFile(app *Application, source string, destination string) error {
 		return err
 	}
 
-	app.debugLog.Printf("Success load file %s", source)
+	app.Logger.DebugLog.Printf("Success load file %s", source)
 
-	status, err := (*app.yaDisk).GetOperationStatus(link.OperationID, nil)
+	status, err := (*app.YaDisk).GetOperationStatus(link.OperationID, nil)
 	if err != nil {
 		return err
 	}
 
-	app.debugLog.Printf("Status %s", status.Status)
+	app.Logger.DebugLog.Printf("Status %s", status.Status)
 
 	return nil
 }
 
-func deleteFile(app *Application, fileName string, md5 string) error {
-	_, err := (*app.yaDisk).DeleteResource(fileName, nil, false, md5, false)
+func deleteFile(app *maintypes.AppData, fileName string, md5 string) error {
+	_, err := (*app.YaDisk).DeleteResource(fileName, nil, false, md5, false)
 	if err != nil {
 		return err
 	}
-	app.infoLog.Printf("Success delete file %s", fileName)
+	app.Logger.InfoLog.Printf("Success delete file %s", fileName)
 	return nil
 }
 func convertDateString(modified string) (time.Time, error) {
