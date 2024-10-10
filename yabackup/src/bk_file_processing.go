@@ -15,6 +15,11 @@ import (
 	"ybg/internal/types"
 )
 
+type ProcessedFilesResult struct {
+	Ok    int
+	Error int
+}
+
 func GetFilesInfo(application *maintypes.AppData) ([]types.BackupFileInfo, error) {
 	application.Logger.DebugLog.Println("Start get files")
 	application.Logger.DebugLog.Printf("Token expiry %v", application.TokenInfo.Expiry)
@@ -30,12 +35,14 @@ func GetFilesInfo(application *maintypes.AppData) ([]types.BackupFileInfo, error
 	return intersectFiles(application, localFiles, remoteFiles)
 }
 
-func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) error {
+func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) (ProcessedFilesResult, error) {
 	sort.Slice(files, func(i, j int) bool {
 		return time.Time(files[i].LocalFileInfo.Modified).Before(time.Time(files[j].LocalFileInfo.Modified))
 	})
 
 	isError := false
+	uploaded := 0
+	errorUploaded := 0
 
 	for _, file := range files {
 		destinationName := app.Options.RemotePath + "/" + file.RemoteFileName
@@ -45,16 +52,26 @@ func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) error 
 		if err != nil {
 			app.Logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
 			isError = true
+			errorUploaded++
+		} else {
+			uploaded++
 		}
 	}
+
+	err := fmt.Errorf("plug")
+	err = nil
 	if isError {
-		return fmt.Errorf("error when upload files")
+		err = fmt.Errorf("error when upload files")
 	}
-	return nil
+	return ProcessedFilesResult{Ok: uploaded,
+			Error: errorUploaded},
+		err
 }
 
-func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) error {
+func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (ProcessedFilesResult, error) {
 	isError := false
+	deleted := 0
+	errorDeleted := 0
 	//TODO Add real Md5
 	for _, file := range files {
 		remoteName := app.Options.RemotePath + "/" + file.RemoteFileName
@@ -63,12 +80,19 @@ func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) error 
 		if err != nil {
 			app.Logger.ErrorLog.Printf("Error when delete file %s. Err: %s", remoteName, err)
 			isError = true
+			errorDeleted++
+		} else {
+			deleted++
 		}
 	}
+	err := fmt.Errorf("plug")
+	err = nil
 	if isError {
-		return fmt.Errorf("error when delete files")
+		err = fmt.Errorf("error when delete files")
 	}
-	return nil
+	return ProcessedFilesResult{Ok: deleted,
+			Error: errorDeleted},
+		err
 }
 
 func ChooseFilesToUpload(app *maintypes.AppData, files []types.BackupFileInfo) []types.ForUploadFileInfo {

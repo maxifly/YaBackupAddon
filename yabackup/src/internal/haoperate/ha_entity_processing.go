@@ -62,9 +62,11 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 }
 
 type EntityState struct {
-	State  Status
-	AttrV1 string
-	AttrV2 string
+	State       Status
+	OkUpload    int
+	ErrorUpload int
+	OkDelete    int
+	ErrorDelete int
 }
 
 // CustomTime - пользовательский тип, оборачивающий time.Time

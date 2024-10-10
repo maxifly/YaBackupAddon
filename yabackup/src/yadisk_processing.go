@@ -20,6 +20,24 @@ func NewYandexDisk(accessToken string) (yadisk.YaDisk, error) {
 
 }
 
+// TODO Test
+func getDiskInfo(app *maintypes.AppData) (types.DiskInfo, error) {
+	if app.YaDisk == nil {
+		return types.DiskInfo{UsedSpace: 0, TotalSpace: 0}, fmt.Errorf("YandexDisk object is nil")
+	}
+
+	diskInfo, err := (*app.YaDisk).GetDisk([]string{"total_space", "used_space"})
+	if err != nil {
+		app.Logger.ErrorLog.Printf("Error when get remote disk info. %v", err)
+		return types.DiskInfo{UsedSpace: 0, TotalSpace: 0}, fmt.Errorf("error get YandexDisk info")
+	}
+
+	result := types.DiskInfo{UsedSpace: types.FileSize(diskInfo.UsedSpace),
+		TotalSpace: types.FileSize(diskInfo.TotalSpace)}
+	app.Logger.DebugLog.Printf("Get disk info. %v", err)
+	return result, nil
+}
+
 func getRemoteFiles(app *maintypes.AppData) ([]types.RemoteFileInfo, error) {
 	app.Logger.InfoLog.Printf("%v", app.Options.RemotePath)
 	if app.YaDisk == nil {

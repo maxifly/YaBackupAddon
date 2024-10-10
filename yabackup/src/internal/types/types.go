@@ -11,6 +11,11 @@ type TokenInfo struct {
 	Expiry       time.Time `json:"expiry,omitempty"`
 }
 
+type DiskInfo struct {
+	TotalSpace FileSize
+	UsedSpace  FileSize
+}
+
 type GeneralFileInfo struct {
 	Name     string
 	Size     FileSize

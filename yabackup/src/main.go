@@ -170,14 +170,6 @@ func (app *Application) upload1(w http.ResponseWriter, r *http.Request) {
 }
 
 func UploadTask(app *Application) {
-	//Test
-	err := app.appData.HaApi.SetEntityState(haoperate.EntityState{State: haoperate.OK,
-		AttrV1: "v1",
-		AttrV2: "v2,"})
-	if err != nil {
-		app.appData.Logger.ErrorLog.Printf("Error when change entity state. %v", err)
-	}
-	//Test
 	app.refreshTokenIsNeed()
 	filesInfo, err := GetFilesInfo(app.appData)
 	if err != nil {
@@ -186,19 +178,39 @@ func UploadTask(app *Application) {
 	filesToUpload := ChooseFilesToUpload(app.appData, filesInfo)
 	uploadedFileAmount := len(filesToUpload)
 
+	uploadResult := ProcessedFilesResult{}
 	if len(filesToUpload) > 0 {
-		err := UploadFiles(app.appData, filesToUpload)
+		uploadResult, err = UploadFiles(app.appData, filesToUpload)
 		if err != nil {
 			app.appData.Logger.ErrorLog.Printf("Error upload files %s", err)
 			uploadedFileAmount = 0
 		}
 	}
 	filesToDelete := ChooseFilesToDelete(app.appData, filesInfo, uploadedFileAmount)
+
 	app.appData.Logger.DebugLog.Printf("FilesToDelete %v", filesToDelete)
-	err = DeleteFiles(app.appData, filesToDelete)
+	deletedResult, err := DeleteFiles(app.appData, filesToDelete)
+
 	if err != nil {
 		app.appData.Logger.ErrorLog.Printf("Error delete files %s", err)
-		uploadedFileAmount = 0
+	}
+
+	// Save entity
+	state := haoperate.OK
+	if uploadResult.Error > 0 || deletedResult.Error > 0 {
+		state = haoperate.ERROR
+	}
+
+	err = app.appData.HaApi.SetEntityState(
+		haoperate.EntityState{
+			State:       state,
+			OkUpload:    uploadResult.Ok,
+			ErrorUpload: uploadResult.Error,
+			OkDelete:    deletedResult.Ok,
+			ErrorDelete: deletedResult.Error,
+		})
+	if err != nil {
+		app.appData.Logger.ErrorLog.Printf("Error save entity state %s", err)
 	}
 }
 
