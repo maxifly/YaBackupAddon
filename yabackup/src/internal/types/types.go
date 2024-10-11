@@ -49,6 +49,7 @@ type ForUploadFileInfo struct {
 }
 type ForDeleteFileInfo struct {
 	RemoteFileName string
+	FileInfo       GeneralFileInfo
 	MD5            string
 }
 

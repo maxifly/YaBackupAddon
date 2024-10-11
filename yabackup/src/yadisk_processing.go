@@ -20,7 +20,7 @@ func NewYandexDisk(accessToken string) (yadisk.YaDisk, error) {
 
 }
 
-// TODO Test
+// TODO
 func getDiskInfo(app *maintypes.AppData) (types.DiskInfo, error) {
 	if app.YaDisk == nil {
 		return types.DiskInfo{UsedSpace: 0, TotalSpace: 0}, fmt.Errorf("YandexDisk object is nil")

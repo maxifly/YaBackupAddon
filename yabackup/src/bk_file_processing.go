@@ -16,8 +16,9 @@ import (
 )
 
 type ProcessedFilesResult struct {
-	Ok    int
-	Error int
+	Ok            int
+	Error         int
+	ProcessedSize types.FileSize
 }
 
 func GetFilesInfo(application *maintypes.AppData) ([]types.BackupFileInfo, error) {
@@ -43,6 +44,7 @@ func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) (Proce
 	isError := false
 	uploaded := 0
 	errorUploaded := 0
+	processedSize := types.FileSize(0)
 
 	for _, file := range files {
 		destinationName := app.Options.RemotePath + "/" + file.RemoteFileName
@@ -55,6 +57,7 @@ func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) (Proce
 			errorUploaded++
 		} else {
 			uploaded++
+			processedSize += file.LocalFileInfo.Size
 		}
 	}
 
@@ -64,7 +67,8 @@ func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) (Proce
 		err = fmt.Errorf("error when upload files")
 	}
 	return ProcessedFilesResult{Ok: uploaded,
-			Error: errorUploaded},
+			Error:         errorUploaded,
+			ProcessedSize: processedSize},
 		err
 }
 
@@ -72,6 +76,7 @@ func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (Proce
 	isError := false
 	deleted := 0
 	errorDeleted := 0
+	processedSize := types.FileSize(0)
 	//TODO Add real Md5
 	for _, file := range files {
 		remoteName := app.Options.RemotePath + "/" + file.RemoteFileName
@@ -83,6 +88,7 @@ func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (Proce
 			errorDeleted++
 		} else {
 			deleted++
+			processedSize += file.FileInfo.Size
 		}
 	}
 	err := fmt.Errorf("plug")
@@ -91,7 +97,8 @@ func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (Proce
 		err = fmt.Errorf("error when delete files")
 	}
 	return ProcessedFilesResult{Ok: deleted,
-			Error: errorDeleted},
+			Error:         errorDeleted,
+			ProcessedSize: processedSize},
 		err
 }
 
@@ -132,7 +139,9 @@ func ChooseFilesToDelete(app *maintypes.AppData, files []types.BackupFileInfo, u
 	})
 
 	for _, file := range remoteFiles {
-		result = append(result, types.ForDeleteFileInfo{RemoteFileName: file.RemoteFileName, MD5: ""})
+		result = append(result, types.ForDeleteFileInfo{RemoteFileName: file.RemoteFileName,
+			MD5:      "",
+			FileInfo: file.GeneralInfo})
 		fileAmount--
 		if app.Options.RemoteMaximumFilesQuantity >= fileAmount {
 			break

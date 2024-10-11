@@ -62,11 +62,15 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 }
 
 type EntityState struct {
-	State       Status
-	OkUpload    int
-	ErrorUpload int
-	OkDelete    int
-	ErrorDelete int
+	State            Status
+	OkUpload         int
+	ErrorUpload      int
+	OkDelete         int
+	ErrorDelete      int
+	LocalSize        types.FileSize
+	RemoteSize       types.FileSize
+	RemoteFreeSpace  types.FileSize
+	LastUploadedTime CustomTime
 }
 
 // CustomTime - пользовательский тип, оборачивающий time.Time
@@ -98,8 +102,14 @@ func (c *CustomTime) UnmarshalJSON(data []byte) error {
 // Определяем структуру, соответствующую JSON объекту
 
 type EntityAttributes struct {
-	NextRising  string `json:"next_rising"`
-	NextSetting string `json:"next_setting"`
+	OkUploadAmount    int        `json:"ok_upload_amount"`
+	ErrorUploadAmount int        `json:"error_upload_amount"`
+	OkDeleteAmount    int        `json:"ok_delete_amount"`
+	ErrorDeleteAmount int        `json:"error_delete_amount"`
+	RemoteFileSize    int64      `json:"remote_file_size"`
+	LocalFileSize     int64      `json:"local_file_size"`
+	RemoteFreeSpace   int64      `json:"remote_free_space"`
+	LastUploadTime    CustomTime `json:"last_upload_time"`
 }
 
 type SetEntityStateRequest struct {
@@ -122,8 +132,14 @@ func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 	data := SetEntityStateRequest{
 		State: entityState.State,
 		Attributes: EntityAttributes{
-			NextRising:  entityState.AttrV1,
-			NextSetting: entityState.AttrV2,
+			OkUploadAmount:    entityState.OkUpload,
+			ErrorUploadAmount: entityState.ErrorUpload,
+			OkDeleteAmount:    entityState.OkDelete,
+			ErrorDeleteAmount: entityState.ErrorDelete,
+			RemoteFileSize:    int64(entityState.RemoteSize),
+			LocalFileSize:     int64(entityState.LocalSize),
+			RemoteFreeSpace:   int64(entityState.RemoteFreeSpace),
+			LastUploadTime:    entityState.LastUploadedTime,
 		},
 	}
 

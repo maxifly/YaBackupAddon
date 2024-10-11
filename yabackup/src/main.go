@@ -195,6 +195,29 @@ func UploadTask(app *Application) {
 		app.appData.Logger.ErrorLog.Printf("Error delete files %s", err)
 	}
 
+	localFileSize := types.FileSize(0)
+	remoteFileSize := types.FileSize(0)
+
+	// Get file sizes for start state
+	for _, file := range filesInfo {
+		if file.IsRemote {
+			remoteFileSize += file.GeneralInfo.Size
+		}
+
+		if file.IsLocal {
+			localFileSize += file.GeneralInfo.Size
+		}
+	}
+
+	// Calculate file sizes for end state
+	remoteFileSize = remoteFileSize - deletedResult.ProcessedSize + uploadResult.ProcessedSize
+
+	// Get disk info
+	diskInfo, err := getDiskInfo(app.appData)
+	if err != nil {
+		app.appData.Logger.ErrorLog.Printf("Error get disk info %s", err)
+	}
+
 	// Save entity
 	state := haoperate.OK
 	if uploadResult.Error > 0 || deletedResult.Error > 0 {
@@ -203,11 +226,15 @@ func UploadTask(app *Application) {
 
 	err = app.appData.HaApi.SetEntityState(
 		haoperate.EntityState{
-			State:       state,
-			OkUpload:    uploadResult.Ok,
-			ErrorUpload: uploadResult.Error,
-			OkDelete:    deletedResult.Ok,
-			ErrorDelete: deletedResult.Error,
+			State:            state,
+			OkUpload:         uploadResult.Ok,
+			ErrorUpload:      uploadResult.Error,
+			OkDelete:         deletedResult.Ok,
+			ErrorDelete:      deletedResult.Error,
+			LocalSize:        localFileSize,
+			RemoteSize:       remoteFileSize,
+			RemoteFreeSpace:  diskInfo.TotalSpace - diskInfo.UsedSpace,
+			LastUploadedTime: haoperate.CustomTime{Time: time.Now()},
 		})
 	if err != nil {
 		app.appData.Logger.ErrorLog.Printf("Error save entity state %s", err)
@@ -256,6 +283,7 @@ func (app *Application) ensureHaApiClient() {
 			app.appData.Logger.ErrorLog.Printf("Error when create ha_api client: %v", err)
 			return
 		}
+		fmt.Printf("%+v\n", api)
 		app.appData.HaApi = api
 	}
 }
