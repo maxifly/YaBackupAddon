@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
 
@@ -21,7 +22,7 @@ type HaApiClient struct {
 	ctx        context.Context
 	httpClient *http.Client
 	token      string
-	logger     *types.Logger
+	logger     *mylogger.Logger
 }
 
 // Status Определяем Enum для статуса
@@ -117,7 +118,7 @@ type SetEntityStateRequest struct {
 	Attributes EntityAttributes `json:"attributes"`
 }
 
-func NewHaApi(ctx context.Context, client *http.Client, token string, logger *types.Logger) (*HaApiClient, error) {
+func NewHaApi(ctx context.Context, client *http.Client, token string, logger *mylogger.Logger) (*HaApiClient, error) {
 	if token == "" {
 		return nil, errors.New("required token")
 	}

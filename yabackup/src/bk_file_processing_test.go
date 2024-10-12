@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 	"ybg/internal/maintypes"
-	"ybg/internal/types"
+	"ybg/internal/pkg/mylogger"
 )
 
 func Test_extractArchInfo(t *testing.T) {
@@ -16,7 +16,7 @@ func Test_extractArchInfo(t *testing.T) {
 
 	appData := &maintypes.AppData{
 		Options: maintypes.ApplOptions{},
-		Logger: &types.Logger{ErrorLog: errorLog,
+		Logger: &mylogger.Logger{ErrorLog: errorLog,
 			InfoLog:  errorLog,
 			DebugLog: errorLog},
 	}
@@ -34,7 +34,7 @@ func Test_extractBadArchInfo(t *testing.T) {
 
 	app := &maintypes.AppData{
 		Options: maintypes.ApplOptions{},
-		Logger: &types.Logger{ErrorLog: errorLog,
+		Logger: &mylogger.Logger{ErrorLog: errorLog,
 			InfoLog:  infoLog,
 			DebugLog: infoLog},
 	}

@@ -4,6 +4,7 @@ import (
 	"github.com/nikitaksv/yandex-disk-sdk-go"
 	"log"
 	"ybg/internal/haoperate"
+	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
 
@@ -11,7 +12,7 @@ type AppData struct {
 	errorLog  *log.Logger
 	infoLog   *log.Logger
 	debugLog  *log.Logger
-	Logger    *types.Logger
+	Logger    *mylogger.Logger
 	Options   ApplOptions
 	TokenInfo types.TokenInfo
 	YaDisk    *yadisk.YaDisk

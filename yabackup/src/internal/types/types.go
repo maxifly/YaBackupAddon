@@ -1,7 +1,6 @@
 package types
 
 import (
-	"log"
 	"time"
 )
 
@@ -51,10 +50,4 @@ type ForDeleteFileInfo struct {
 	RemoteFileName string
 	FileInfo       GeneralFileInfo
 	MD5            string
-}
-
-type Logger struct {
-	ErrorLog *log.Logger
-	InfoLog  *log.Logger
-	DebugLog *log.Logger
 }

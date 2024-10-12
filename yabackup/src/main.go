@@ -14,6 +14,7 @@ import (
 	"time"
 	"ybg/internal/haoperate"
 	"ybg/internal/maintypes"
+	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
 
@@ -330,9 +331,8 @@ func main() {
 		port = "8099"
 	}
 
-	debugLog := log.New(NewNullWriter(), "DEBUG\t", log.Ldate|log.Ltime|log.Lshortfile)
-
-	infoLog := log.New(NewNullWriter(), "INFO\t", log.Ldate|log.Ltime)
+	debugLog := log.New(mylogger.NewNullWriter(), "DEBUG\t", log.Ldate|log.Ltime|log.Lshortfile)
+	infoLog := log.New(mylogger.NewNullWriter(), "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
 	scheduleLogLevel := gocron.LogLevelWarn
@@ -360,7 +360,7 @@ func main() {
 	errorLog.Println("hello")
 
 	// Инициализируем новую структуру с зависимостями приложения.
-	logger := types.Logger{ErrorLog: errorLog,
+	logger := mylogger.Logger{ErrorLog: errorLog,
 		InfoLog:  infoLog,
 		DebugLog: debugLog}
 
