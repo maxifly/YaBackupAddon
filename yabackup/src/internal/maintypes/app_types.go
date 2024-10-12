@@ -3,7 +3,7 @@ package maintypes
 import (
 	"github.com/nikitaksv/yandex-disk-sdk-go"
 	"log"
-	"ybg/internal/haoperate"
+	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )

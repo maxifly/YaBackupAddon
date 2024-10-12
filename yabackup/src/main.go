@@ -12,8 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	"ybg/internal/haoperate"
 	"ybg/internal/maintypes"
+	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
@@ -331,9 +331,11 @@ func main() {
 		port = "8099"
 	}
 
-	debugLog := log.New(mylogger.NewNullWriter(), "DEBUG\t", log.Ldate|log.Ltime|log.Lshortfile)
-	infoLog := log.New(mylogger.NewNullWriter(), "INFO\t", log.Ldate|log.Ltime)
-	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	logFormat := log.Ldate | log.Ltime | log.Lshortfile
+
+	debugLog := log.New(mylogger.NewNullWriter(), "DEBUG\t", logFormat)
+	infoLog := log.New(mylogger.NewNullWriter(), "INFO\t", logFormat)
+	errorLog := log.New(os.Stderr, "ERROR\t", logFormat)
 
 	scheduleLogLevel := gocron.LogLevelWarn
 
@@ -345,13 +347,13 @@ func main() {
 	}
 
 	if options.LogLevel == "DEBUG" {
-		debugLog = log.New(os.Stdout, "DEBUG\t", log.Ldate|log.Ltime|log.Lshortfile)
-		infoLog = log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
+		debugLog = log.New(os.Stdout, "DEBUG\t", logFormat)
+		infoLog = log.New(os.Stdout, "INFO\t", logFormat)
 		scheduleLogLevel = gocron.LogLevelDebug
 
 	}
 	if options.LogLevel == "INFO" {
-		infoLog = log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
+		infoLog = log.New(os.Stdout, "INFO\t", logFormat)
 		scheduleLogLevel = gocron.LogLevelInfo
 	}
 
