@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/mux"
 	"html/template"
 	"net/http"
+	"path/filepath"
 	"time"
 	"ybg/internal/pkg/bkoperate"
 	"ybg/internal/pkg/haoperate"
@@ -58,9 +59,9 @@ func NewRest(port string,
 	router.HandleFunc("/index", restObj.indexHandler).Methods("GET")
 	router.HandleFunc("/get_token", restObj.getTokenForm).Methods("GET")
 	router.HandleFunc("/get_token", restObj.getToken).Methods("POST")
-	//router.HandleFunc("/start_upload", app.startUpload).Methods("GET")
-	//router.HandleFunc("/upload1", app.upload1).Methods("GET")
-	//router.HandleFunc("/download/{fileName}", app.downloadFile).Methods("GET")
+	router.HandleFunc("/start_upload", restObj.startUpload).Methods("GET")
+	router.HandleFunc("/upload1", restObj.upload1).Methods("GET")
+	router.HandleFunc("/download/{fileName}", restObj.downloadFile).Methods("GET")
 
 	logger.ErrorLog.Printf("(It is not error!!!) Run WEB-Server on http://127.0.0.1:%s", port)
 
@@ -195,6 +196,7 @@ func (app *Rest) upload1(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, uri+"/", http.StatusSeeOther)
 }
 
+// UploadTask TODO Может перенести в bk_processor
 func UploadTask(app *Rest) {
 	app.yaDProcessor.RefreshTokenIsNeed()
 	filesInfo, err := app.bKProcessor.GetFilesInfo()
@@ -202,6 +204,8 @@ func UploadTask(app *Rest) {
 		app.logger.ErrorLog.Printf("Error get backup files %s", err)
 	}
 	filesToUpload := bkoperate.ChooseFilesToUpload(filesInfo)
+	app.logger.InfoLog.Printf("Need upload %d files", len(filesToUpload))
+
 	uploadedFileAmount := len(filesToUpload)
 
 	uploadResult := bkoperate.ProcessedFilesResult{}
@@ -265,4 +269,15 @@ func UploadTask(app *Rest) {
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error save entity state %s", err)
 	}
+}
+
+func (app *Rest) downloadFile(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	fileName, ok := vars["fileName"]
+	if !ok {
+		app.logger.ErrorLog.Printf("fileName is missing in parameters")
+	}
+	app.logger.DebugLog.Printf("filename: %s", fileName)
+	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(fileName))
+	http.ServeFile(w, r, fileName)
 }

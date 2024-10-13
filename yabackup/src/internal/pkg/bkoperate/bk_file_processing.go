@@ -11,9 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"ybg/internal/maintypes"
 	"ybg/internal/pkg/mylogger"
-	"ybg/internal/pkg/yadiskoperate"
 	"ybg/internal/types"
 )
 
@@ -58,36 +56,6 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 		err
 }
 
-func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (ProcessedFilesResult, error) {
-	isError := false
-	deleted := 0
-	errorDeleted := 0
-	processedSize := types.FileSize(0)
-	//TODO Add real Md5
-	for _, file := range files {
-		remoteName := app.Options.RemotePath + "/" + file.RemoteFileName
-		logger.DebugLog.Printf("Try delete %s", remoteName)
-		err := yadiskoperate.deleteFile(app, remoteName, file.MD5)
-		if err != nil {
-			logger.ErrorLog.Printf("Error when delete file %s. Err: %s", remoteName, err)
-			isError = true
-			errorDeleted++
-		} else {
-			deleted++
-			processedSize += file.FileInfo.Size
-		}
-	}
-	err := fmt.Errorf("plug")
-	err = nil
-	if isError {
-		err = fmt.Errorf("error when delete files")
-	}
-	return ProcessedFilesResult{Ok: deleted,
-			Error:         errorDeleted,
-			ProcessedSize: processedSize},
-		err
-}
-
 func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo {
 	result := make([]types.ForUploadFileInfo, 0)
 	for _, file := range files {
@@ -98,7 +66,6 @@ func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo
 			})
 		}
 	}
-	logger.InfoLog.Printf("Need upload %d files", len(result))
 	return result
 }
 
@@ -167,7 +134,7 @@ func getLocalBackupFiles(logger *mylogger.Logger) (map[string]types.LocalBackupF
 
 	entries, err := os.ReadDir(BACKUP_PATH)
 	if err != nil {
-		logger.ErrorLog.Printf("Unable to read backup %s. %v", main.BACKUP_PATH, err)
+		logger.ErrorLog.Printf("Unable to read backup %s. %v", BACKUP_PATH, err)
 		return nil, fmt.Errorf("error when read local backups")
 	}
 	result := make(map[string]types.LocalBackupFileInfo)

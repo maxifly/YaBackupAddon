@@ -1,4 +1,4 @@
-package main
+package bkoperate
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -7,22 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"ybg/internal/maintypes"
-	"ybg/internal/pkg/bkoperate"
 	"ybg/internal/pkg/mylogger"
 )
 
 func Test_extractArchInfo(t *testing.T) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
-	appData := &maintypes.AppData{
-		Options: maintypes.ApplOptions{},
-		Logger: &mylogger.Logger{ErrorLog: errorLog,
-			InfoLog:  errorLog,
-			DebugLog: errorLog},
-	}
+	logger := &mylogger.Logger{ErrorLog: errorLog,
+		InfoLog:  errorLog,
+		DebugLog: errorLog}
 
-	info, err := bkoperate.extractArchInfo(appData, filepath.Join("testresources", "correct_file.tar"))
+	info, err := extractArchInfo(logger, filepath.Join("testresources", "correct_file.tar"))
 
 	assert.Nil(t, err, "Error must be nil")
 	assert.Equal(t, "5508d5ad", info.Slug, "Slug not equal")
@@ -33,12 +28,9 @@ func Test_extractBadArchInfo(t *testing.T) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 	infoLog := log.New(os.Stderr, "INFO\t", log.Ldate|log.Ltime|log.Lshortfile)
 
-	app := &maintypes.AppData{
-		Options: maintypes.ApplOptions{},
-		Logger: &mylogger.Logger{ErrorLog: errorLog,
-			InfoLog:  infoLog,
-			DebugLog: infoLog},
-	}
+	logger := &mylogger.Logger{ErrorLog: errorLog,
+		InfoLog:  infoLog,
+		DebugLog: errorLog}
 
 	type args struct {
 		fileName string
@@ -56,7 +48,7 @@ func Test_extractBadArchInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := bkoperate.extractArchInfo(app, filepath.Join("testresources", tt.args.fileName))
+			_, err := extractArchInfo(logger, filepath.Join("testresources", tt.args.fileName))
 			assert.NotNilf(t, err, "Error expected. Test %s", tt.name)
 			assert.True(t, strings.Contains(err.Error(), tt.want), "Error mast contain text %s. Real error message: %s. Test %s", tt.want, err.Error(), tt.name)
 		})
