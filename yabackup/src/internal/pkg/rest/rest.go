@@ -4,6 +4,8 @@ import (
 	"github.com/gorilla/mux"
 	"html/template"
 	"net/http"
+	"time"
+	"ybg/internal/pkg/bkoperate"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/pkg/yadiskoperate"
@@ -13,30 +15,49 @@ import (
 type AlertMessage struct {
 	Message string
 }
+type BackupResponse struct {
+	IsDarkTheme   bool
+	AlertMessages []AlertMessage
+	BFiles        []types.BackupFileInfo
+}
+type GetTokenResponse struct {
+	IsDarkTheme   bool
+	AlertMessages []AlertMessage
+	CheckCodeUrl  string
+}
 
 type Rest struct {
 	logger       *mylogger.Logger
 	TokenInfo    types.TokenInfo
 	yaDProcessor *yadiskoperate.YaDProcessor
+	bKProcessor  *bkoperate.BkProcessor
 	haApi        *haoperate.HaApiClient
 	router       *mux.Router
 	port         string
+	theme        string
 }
 
 func NewRest(port string,
 	yaDProcessor *yadiskoperate.YaDProcessor,
+	bKProcessor *bkoperate.BkProcessor,
 	haApi *haoperate.HaApiClient,
+	theme string,
 	logger *mylogger.Logger) (*Rest, error) {
 
 	router := mux.NewRouter()
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", fileServer))
-	restObj := Rest{port: port, yaDProcessor: yaDProcessor, haApi: haApi, logger: logger}
+	restObj := Rest{port: port,
+		yaDProcessor: yaDProcessor,
+		bKProcessor:  bKProcessor,
+		haApi:        haApi,
+		theme:        theme,
+		logger:       logger}
 
 	router.HandleFunc("/", restObj.indexHandler).Methods("GET")
-	//router.HandleFunc("/index", app.indexHandler).Methods("GET")
-	//router.HandleFunc("/get_token", app.getTokenForm).Methods("GET")
-	//router.HandleFunc("/get_token", app.getToken).Methods("POST")
+	router.HandleFunc("/index", restObj.indexHandler).Methods("GET")
+	router.HandleFunc("/get_token", restObj.getTokenForm).Methods("GET")
+	router.HandleFunc("/get_token", restObj.getToken).Methods("POST")
 	//router.HandleFunc("/start_upload", app.startUpload).Methods("GET")
 	//router.HandleFunc("/upload1", app.upload1).Methods("GET")
 	//router.HandleFunc("/download/{fileName}", app.downloadFile).Methods("GET")
@@ -48,6 +69,10 @@ func NewRest(port string,
 
 func (rest *Rest) Start() error {
 	return http.ListenAndServe(":"+rest.port, rest.router)
+}
+
+func (app *Rest) isUseDarkTheme() bool {
+	return app.theme == "Dark"
 }
 
 func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -72,16 +97,172 @@ func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.yaDProcessor.RefreshTokenIsNeed()
-	filesInfo, err := GetFilesInfo(app.appData)
+	filesInfo, err := app.bKProcessor.GetFilesInfo()
 	if err != nil {
 		alertMessages = append(alertMessages, AlertMessage{Message: err.Error()})
 	}
 
-	data := BackupResponse{BFiles: filesInfo, AlertMessages: alertMessages, IsDarkTheme: app.appData.Options.IsUseDarkTheme()}
+	data := BackupResponse{BFiles: filesInfo, AlertMessages: alertMessages, IsDarkTheme: app.isUseDarkTheme()}
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		app.appData.Logger.ErrorLog.Println(err.Error())
+		app.logger.ErrorLog.Println(err.Error())
 		http.Error(w, "Internal Server Error", 500)
+	}
+}
+
+func (app *Rest) getTokenForm(w http.ResponseWriter, r *http.Request) {
+	app.logger.InfoLog.Println("getTokenForm")
+	app.renderTokenForm(w, r, "")
+}
+func (app *Rest) renderTokenForm(w http.ResponseWriter, r *http.Request, errorMessage string) {
+	app.logger.InfoLog.Println("getTokenForm")
+	files := []string{
+		"./ui/html/get_token.html",
+		"./ui/html/base.html",
+	}
+
+	ts, err := template.ParseFiles(files...)
+	if err != nil {
+		app.logger.ErrorLog.Println(err.Error())
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+
+	alertMessages := make([]AlertMessage, 0)
+	if errorMessage != "" {
+		alertMessages = append(alertMessages, AlertMessage{Message: errorMessage})
+	}
+
+	data := GetTokenResponse{CheckCodeUrl: app.yaDProcessor.GetCheckCodeUrl(),
+		AlertMessages: alertMessages,
+		IsDarkTheme:   app.isUseDarkTheme()}
+	err = ts.Execute(w, data)
+	if err != nil {
+		app.logger.ErrorLog.Println(err.Error())
+		http.Error(w, "Internal Server Error", 500)
+	}
+}
+
+func (app *Rest) getToken(w http.ResponseWriter, r *http.Request) {
+	app.logger.InfoLog.Println("getToken")
+	checkCode := r.PostFormValue("check_code")
+	if checkCode == "" {
+		app.renderTokenForm(w, r, "Check code is required!")
+	} else {
+		_, err := app.yaDProcessor.CreateToken(
+			r.PostFormValue("check_code"))
+		if err != nil {
+			app.logger.ErrorLog.Printf("Get token error. %v", err.Error())
+			http.Error(w, "Create TokenInfo Error", 500)
+		}
+
+		app.yaDProcessor.EnsureYandexDisk()
+		uri := r.Header.Get("X-Ingress-Path")
+		http.Redirect(w, r, uri+"/", http.StatusSeeOther)
+	}
+}
+
+func (app *Rest) startUpload(w http.ResponseWriter, r *http.Request) {
+	app.logger.InfoLog.Println("startUpload")
+	files := []string{
+		"./ui/html/start_upload.html",
+		"./ui/html/base.html",
+	}
+	ts, err := template.ParseFiles(files...)
+	if err != nil {
+		app.logger.ErrorLog.Println(err.Error())
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+
+	alertMessages := make([]AlertMessage, 0)
+	data := GetTokenResponse{CheckCodeUrl: app.yaDProcessor.GetCheckCodeUrl(),
+		AlertMessages: alertMessages,
+		IsDarkTheme:   app.isUseDarkTheme()}
+
+	err = ts.Execute(w, data)
+	if err != nil {
+		app.logger.ErrorLog.Println(err.Error())
+		http.Error(w, "Internal Server Error", 500)
+	}
+}
+
+func (app *Rest) upload1(w http.ResponseWriter, r *http.Request) {
+	app.logger.InfoLog.Println("upload1")
+	UploadTask(app)
+	uri := r.Header.Get("X-Ingress-Path")
+	http.Redirect(w, r, uri+"/", http.StatusSeeOther)
+}
+
+func UploadTask(app *Rest) {
+	app.yaDProcessor.RefreshTokenIsNeed()
+	filesInfo, err := app.bKProcessor.GetFilesInfo()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error get backup files %s", err)
+	}
+	filesToUpload := bkoperate.ChooseFilesToUpload(filesInfo)
+	uploadedFileAmount := len(filesToUpload)
+
+	uploadResult := bkoperate.ProcessedFilesResult{}
+	if len(filesToUpload) > 0 {
+		uploadResult, err = app.bKProcessor.UploadFiles(filesToUpload)
+		if err != nil {
+			app.logger.ErrorLog.Printf("Error upload files %s", err)
+			uploadedFileAmount = 0
+		}
+	}
+	filesToDelete := app.bKProcessor.ChooseFilesToDelete(filesInfo, uploadedFileAmount)
+
+	app.logger.DebugLog.Printf("FilesToDelete %v", filesToDelete)
+	deletedResult, err := app.bKProcessor.DeleteFiles(filesToDelete)
+
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error delete files %s", err)
+	}
+
+	localFileSize := types.FileSize(0)
+	remoteFileSize := types.FileSize(0)
+
+	// Get file sizes for start state
+	for _, file := range filesInfo {
+		if file.IsRemote {
+			remoteFileSize += file.GeneralInfo.Size
+		}
+
+		if file.IsLocal {
+			localFileSize += file.GeneralInfo.Size
+		}
+	}
+
+	// Calculate file sizes for end state
+	remoteFileSize = remoteFileSize - deletedResult.ProcessedSize + uploadResult.ProcessedSize
+
+	// Get disk info
+	diskInfo, err := app.yaDProcessor.GetDiskInfo()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error get disk info %s", err)
+	}
+
+	// Save entity
+	state := haoperate.OK
+	if uploadResult.Error > 0 || deletedResult.Error > 0 {
+		state = haoperate.ERROR
+	}
+
+	err = app.haApi.SetEntityState(
+		haoperate.EntityState{
+			State:            state,
+			OkUpload:         uploadResult.Ok,
+			ErrorUpload:      uploadResult.Error,
+			OkDelete:         deletedResult.Ok,
+			ErrorDelete:      deletedResult.Error,
+			LocalSize:        localFileSize,
+			RemoteSize:       remoteFileSize,
+			RemoteFreeSpace:  diskInfo.TotalSpace - diskInfo.UsedSpace,
+			LastUploadedTime: haoperate.CustomTime{Time: time.Now()},
+		})
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error save entity state %s", err)
 	}
 }

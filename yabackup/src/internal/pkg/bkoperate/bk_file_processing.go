@@ -1,4 +1,4 @@
-package main
+package bkoperate
 
 import (
 	"archive/tar"
@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 	"ybg/internal/maintypes"
+	"ybg/internal/pkg/mylogger"
 	"ybg/internal/pkg/yadiskoperate"
 	"ybg/internal/types"
 )
@@ -22,22 +23,7 @@ type ProcessedFilesResult struct {
 	ProcessedSize types.FileSize
 }
 
-func GetFilesInfo(application *maintypes.AppData) ([]types.BackupFileInfo, error) {
-	application.Logger.DebugLog.Println("Start get files")
-	application.Logger.DebugLog.Printf("Token expiry %v", application.TokenInfo.Expiry)
-	remoteFiles, err := yadiskoperate.getRemoteFiles(application)
-	if err != nil {
-		return make([]types.BackupFileInfo, 0), err
-	}
-	localFiles, err := getLocalBackupFiles(application)
-	if err != nil {
-		return make([]types.BackupFileInfo, 0), err
-	}
-
-	return intersectFiles(application, localFiles, remoteFiles)
-}
-
-func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) (ProcessedFilesResult, error) {
+func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFilesResult, error) {
 	sort.Slice(files, func(i, j int) bool {
 		return time.Time(files[i].LocalFileInfo.Modified).Before(time.Time(files[j].LocalFileInfo.Modified))
 	})
@@ -48,12 +34,11 @@ func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) (Proce
 	processedSize := types.FileSize(0)
 
 	for _, file := range files {
-		destinationName := app.Options.RemotePath + "/" + file.RemoteFileName
 		sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
-		app.Logger.DebugLog.Printf("Try upload %s into %s", sourceName, destinationName)
-		err := yadiskoperate.uploadFile(app, sourceName, destinationName)
+		app.logger.DebugLog.Printf("Try upload %s ", sourceName)
+		err := app.YaDProcessor.UploadFile(sourceName, file.RemoteFileName)
 		if err != nil {
-			app.Logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
+			app.logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
 			isError = true
 			errorUploaded++
 		} else {
@@ -81,10 +66,10 @@ func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (Proce
 	//TODO Add real Md5
 	for _, file := range files {
 		remoteName := app.Options.RemotePath + "/" + file.RemoteFileName
-		app.Logger.DebugLog.Printf("Try delete %s", remoteName)
+		logger.DebugLog.Printf("Try delete %s", remoteName)
 		err := yadiskoperate.deleteFile(app, remoteName, file.MD5)
 		if err != nil {
-			app.Logger.ErrorLog.Printf("Error when delete file %s. Err: %s", remoteName, err)
+			logger.ErrorLog.Printf("Error when delete file %s. Err: %s", remoteName, err)
 			isError = true
 			errorDeleted++
 		} else {
@@ -103,7 +88,7 @@ func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (Proce
 		err
 }
 
-func ChooseFilesToUpload(app *maintypes.AppData, files []types.BackupFileInfo) []types.ForUploadFileInfo {
+func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo {
 	result := make([]types.ForUploadFileInfo, 0)
 	for _, file := range files {
 		if file.IsLocal && !file.IsRemote {
@@ -113,49 +98,13 @@ func ChooseFilesToUpload(app *maintypes.AppData, files []types.BackupFileInfo) [
 			})
 		}
 	}
-	app.Logger.InfoLog.Printf("Need upload %d files", len(result))
-	return result
-}
-
-func ChooseFilesToDelete(app *maintypes.AppData, files []types.BackupFileInfo, uploadFileCount int) []types.ForDeleteFileInfo {
-	result := make([]types.ForDeleteFileInfo, 0)
-	remoteFiles := make([]types.BackupFileInfo, 0)
-	for _, file := range files {
-		if file.IsRemote {
-			remoteFiles = append(remoteFiles, file)
-
-		}
-	}
-
-	fileAmount := uploadFileCount + len(remoteFiles)
-
-	if app.Options.RemoteMaximumFilesQuantity >= fileAmount {
-		app.Logger.InfoLog.Printf("Not need delete files")
-		return result
-	}
-
-	// Отсортируем. Старые файлы идут первыми.
-	sort.Slice(remoteFiles, func(i, j int) bool {
-		return time.Time(remoteFiles[i].GeneralInfo.Modified).Before(time.Time(remoteFiles[j].GeneralInfo.Modified))
-	})
-
-	for _, file := range remoteFiles {
-		result = append(result, types.ForDeleteFileInfo{RemoteFileName: file.RemoteFileName,
-			MD5:      "",
-			FileInfo: file.GeneralInfo})
-		fileAmount--
-		if app.Options.RemoteMaximumFilesQuantity >= fileAmount {
-			break
-		}
-	}
-
-	app.Logger.InfoLog.Printf("Need delete %d files", len(result))
+	logger.InfoLog.Printf("Need upload %d files", len(result))
 	return result
 }
 
 type stringSet map[string]bool
 
-func intersectFiles(app *maintypes.AppData,
+func intersectFiles(
 	localFiles map[string]types.LocalBackupFileInfo,
 	remoteFiles []types.RemoteFileInfo) ([]types.BackupFileInfo, error) {
 
@@ -214,32 +163,32 @@ func generateRemoteFileName(localFile types.LocalBackupFileInfo) string {
 	return strings.ReplaceAll(strings.ReplaceAll(localFile.BackupName+"_"+localFile.Slug, " ", "-"), ":", "_")
 }
 
-func getLocalBackupFiles(app *maintypes.AppData) (map[string]types.LocalBackupFileInfo, error) {
+func getLocalBackupFiles(logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
 
 	entries, err := os.ReadDir(BACKUP_PATH)
 	if err != nil {
-		app.Logger.ErrorLog.Printf("Unable to read backup %s. %v", BACKUP_PATH, err)
+		logger.ErrorLog.Printf("Unable to read backup %s. %v", main.BACKUP_PATH, err)
 		return nil, fmt.Errorf("error when read local backups")
 	}
 	result := make(map[string]types.LocalBackupFileInfo)
 	for _, entry := range entries {
-		app.Logger.DebugLog.Printf("entry %+v", entry)
+		logger.DebugLog.Printf("entry %+v", entry)
 		info, err := entry.Info()
 		if err != nil {
-			app.Logger.ErrorLog.Printf("Error read file info %v", err)
+			logger.ErrorLog.Printf("Error read file info %v", err)
 			continue
 		}
-		app.Logger.DebugLog.Printf("info: %+v", info)
+		logger.DebugLog.Printf("info: %+v", info)
 
 		if info.IsDir() {
 			continue
 		}
 
 		filePath := filepath.Join(BACKUP_PATH, info.Name())
-		app.Logger.DebugLog.Printf("Read %s", filePath)
-		archInfo, err := extractArchInfo(app, filePath)
+		logger.DebugLog.Printf("Read %s", filePath)
+		archInfo, err := extractArchInfo(logger, filePath)
 		if err != nil {
-			app.Logger.ErrorLog.Printf("Error extract slug from %s %v", info.Name(), err)
+			logger.ErrorLog.Printf("Error extract slug from %s %v", info.Name(), err)
 			continue
 		}
 
@@ -261,7 +210,7 @@ func convertBkFileInfoToGeneral(bkFileInfo *fs.FileInfo) types.GeneralFileInfo {
 	}
 }
 
-func extractArchInfo(app *maintypes.AppData, tarfile string) (*types.BackupArchInfo, error) {
+func extractArchInfo(logger *mylogger.Logger, tarfile string) (*types.BackupArchInfo, error) {
 	reader, err := os.Open(tarfile)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: cannot read tar file, error=[%v]\n", err)
@@ -270,7 +219,7 @@ func extractArchInfo(app *maintypes.AppData, tarfile string) (*types.BackupArchI
 	defer func(reader *os.File) {
 		err := reader.Close()
 		if err != nil {
-			app.Logger.ErrorLog.Printf("Can not close reader, error=[%v]", err)
+			logger.ErrorLog.Printf("Can not close reader, error=[%v]", err)
 		}
 	}(reader)
 
@@ -301,7 +250,7 @@ func extractArchInfo(app *maintypes.AppData, tarfile string) (*types.BackupArchI
 			}
 
 			err = json.Unmarshal(plan, &data)
-			app.Logger.DebugLog.Printf("data= %+v\n", data)
+			logger.DebugLog.Printf("data= %+v\n", data)
 			if err != nil {
 				return nil, fmt.Errorf("cannot parse backup info, error=[%v]", err)
 			}

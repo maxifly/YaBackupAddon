@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 	"ybg/internal/maintypes"
+	"ybg/internal/pkg/bkoperate"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/pkg/rest"
@@ -21,7 +22,6 @@ import (
 )
 
 const FILE_PATH_OPTIONS = "/data/options.json"
-const BACKUP_PATH = "/backup"
 
 type Application struct {
 	appData *maintypes.AppData
@@ -67,7 +67,7 @@ func (app *Application) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.refreshTokenIsNeed()
-	filesInfo, err := GetFilesInfo(app.appData)
+	filesInfo, err := bkoperate.GetFilesInfo(app.appData)
 	if err != nil {
 		alertMessages = append(alertMessages, AlertMessage{Message: err.Error()})
 	}
@@ -173,25 +173,25 @@ func (app *Application) upload1(w http.ResponseWriter, r *http.Request) {
 
 func UploadTask(app *Application) {
 	app.refreshTokenIsNeed()
-	filesInfo, err := GetFilesInfo(app.appData)
+	filesInfo, err := bkoperate.GetFilesInfo(app.appData)
 	if err != nil {
 		app.appData.Logger.ErrorLog.Printf("Error get backup files %s", err)
 	}
-	filesToUpload := ChooseFilesToUpload(app.appData, filesInfo)
+	filesToUpload := bkoperate.ChooseFilesToUpload(app.appData, filesInfo)
 	uploadedFileAmount := len(filesToUpload)
 
-	uploadResult := ProcessedFilesResult{}
+	uploadResult := bkoperate.ProcessedFilesResult{}
 	if len(filesToUpload) > 0 {
-		uploadResult, err = UploadFiles(app.appData, filesToUpload)
+		uploadResult, err = bkoperate.UploadFiles(app.appData, filesToUpload)
 		if err != nil {
 			app.appData.Logger.ErrorLog.Printf("Error upload files %s", err)
 			uploadedFileAmount = 0
 		}
 	}
-	filesToDelete := ChooseFilesToDelete(app.appData, filesInfo, uploadedFileAmount)
+	filesToDelete := bkoperate.ChooseFilesToDelete(app.appData, filesInfo, uploadedFileAmount)
 
 	app.appData.Logger.DebugLog.Printf("FilesToDelete %v", filesToDelete)
-	deletedResult, err := DeleteFiles(app.appData, filesToDelete)
+	deletedResult, err := bkoperate.DeleteFiles(app.appData, filesToDelete)
 
 	if err != nil {
 		app.appData.Logger.ErrorLog.Printf("Error delete files %s", err)
@@ -367,7 +367,8 @@ func main() {
 		InfoLog:  infoLog,
 		DebugLog: debugLog}
 
-	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, &logger)
+	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
+	bkP := bkoperate.NewBkProcessor(yaDP, options.RemoteMaximumFilesQuantity, &logger)
 
 	appData := &maintypes.AppData{
 		Options: options,
@@ -401,7 +402,7 @@ func main() {
 	app.ensureHaApiClient()
 
 	// Создаем рест
-	restObj, err := rest.NewRest(port, app.appData.YaDP, app.appData.HaApi, &logger)
+	restObj, err := rest.NewRest(port, app.appData.YaDP, bkP, app.appData.HaApi, options.Theme, &logger)
 	if err != nil {
 		logger.ErrorLog.Printf("Error create Rest %v", err)
 		panic(fmt.Sprintf("error create Rest %v", err))
