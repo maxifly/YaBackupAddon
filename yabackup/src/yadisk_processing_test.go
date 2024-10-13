@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"ybg/internal/pkg/yadiskoperate"
 )
 
 func Test_convertDateString(t *testing.T) {
@@ -21,7 +22,7 @@ func Test_convertDateString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := convertDateString(tt.args.modified)
+			got, err := yadiskoperate.convertDateString(tt.args.modified)
 			if !tt.wantErr(t, err, fmt.Sprintf("convertDateString(%v)", tt.args.modified)) {
 				return
 			}

@@ -5,6 +5,8 @@ import (
 	"log"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
+	"ybg/internal/pkg/rest"
+	"ybg/internal/pkg/yadiskoperate"
 	"ybg/internal/types"
 )
 
@@ -17,6 +19,8 @@ type AppData struct {
 	TokenInfo types.TokenInfo
 	YaDisk    *yadisk.YaDisk
 	HaApi     *haoperate.HaApiClient
+	YaDP      *yadiskoperate.YaDProcessor
+	Rest      *rest.Rest
 }
 
 type ApplOptions struct {

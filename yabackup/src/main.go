@@ -15,11 +15,12 @@ import (
 	"ybg/internal/maintypes"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
+	"ybg/internal/pkg/rest"
+	"ybg/internal/pkg/yadiskoperate"
 	"ybg/internal/types"
 )
 
 const FILE_PATH_OPTIONS = "/data/options.json"
-const FILE_PATH_TOKEN = "/data/tokenInfo.json"
 const BACKUP_PATH = "/backup"
 
 type Application struct {
@@ -59,9 +60,9 @@ func (app *Application) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	alertMessages := make([]AlertMessage, 0)
-	if isTokenEmpty(app.appData.TokenInfo) {
+	if yadiskoperate.isTokenEmpty(app.appData.TokenInfo) {
 		alertMessages = append(alertMessages, AlertMessage{Message: "Token does not exists"})
-	} else if !isTokenValid(app.appData.TokenInfo) {
+	} else if !yadiskoperate.isTokenValid(app.appData.TokenInfo) {
 		alertMessages = append(alertMessages, AlertMessage{Message: "Token is not valid or expired"})
 	}
 
@@ -103,7 +104,7 @@ func (app *Application) renderTokenForm(w http.ResponseWriter, r *http.Request, 
 		alertMessages = append(alertMessages, AlertMessage{Message: errorMessage})
 	}
 
-	data := GetTokenResponse{CheckCodeUrl: GetCheckCodeUrl(app.appData.Options.ClientId), AlertMessages: alertMessages, IsDarkTheme: app.appData.Options.IsUseDarkTheme()}
+	data := GetTokenResponse{CheckCodeUrl: yadiskoperate.GetCheckCodeUrl(app.appData.Options.ClientId), AlertMessages: alertMessages, IsDarkTheme: app.appData.Options.IsUseDarkTheme()}
 	err = ts.Execute(w, data)
 	if err != nil {
 		app.appData.Logger.ErrorLog.Println(err.Error())
@@ -117,7 +118,7 @@ func (app *Application) getToken(w http.ResponseWriter, r *http.Request) {
 	if checkCode == "" {
 		app.renderTokenForm(w, r, "Check code is required!")
 	} else {
-		tokenInfo, err := CreateToken(
+		tokenInfo, err := yadiskoperate.CreateToken(
 			app.appData.Options.ClientId,
 			app.appData.Options.ClientSecret,
 			r.PostFormValue("check_code"))
@@ -126,7 +127,7 @@ func (app *Application) getToken(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Create TokenInfo Error", 500)
 		}
 		app.appData.Logger.DebugLog.Printf("Create token success")
-		err = writeToken(tokenInfo)
+		err = yadiskoperate.writeToken(tokenInfo)
 		if err == nil {
 			app.appData.Logger.DebugLog.Printf("Write token success.")
 			app.appData.TokenInfo = tokenInfo
@@ -154,7 +155,7 @@ func (app *Application) startUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	alertMessages := make([]AlertMessage, 0)
-	data := GetTokenResponse{CheckCodeUrl: GetCheckCodeUrl(app.appData.Options.ClientId), AlertMessages: alertMessages, IsDarkTheme: app.appData.Options.IsUseDarkTheme()}
+	data := GetTokenResponse{CheckCodeUrl: yadiskoperate.GetCheckCodeUrl(app.appData.Options.ClientId), AlertMessages: alertMessages, IsDarkTheme: app.appData.Options.IsUseDarkTheme()}
 
 	err = ts.Execute(w, data)
 	if err != nil {
@@ -214,7 +215,7 @@ func UploadTask(app *Application) {
 	remoteFileSize = remoteFileSize - deletedResult.ProcessedSize + uploadResult.ProcessedSize
 
 	// Get disk info
-	diskInfo, err := getDiskInfo(app.appData)
+	diskInfo, err := yadiskoperate.getDiskInfo(app.appData)
 	if err != nil {
 		app.appData.Logger.ErrorLog.Printf("Error get disk info %s", err)
 	}
@@ -249,27 +250,27 @@ func readOptions() (maintypes.ApplOptions, error) {
 	return data, err
 }
 
-func (app *Application) ensureYandexDisk() {
-	if !isTokenEmpty(app.appData.TokenInfo) {
-		disk, err := NewYandexDisk(app.appData.TokenInfo.AccessToken)
-		if err != nil {
-			app.appData.Logger.ErrorLog.Printf("Error when create YaDisk %v", err)
-			return
-		}
-		app.appData.YaDisk = &disk
-	}
-}
+//func (app *Application) ensureYandexDisk() {
+//	if !yadiskoperate.isTokenEmpty(app.appData.TokenInfo) {
+//		disk, err := NewYandexDisk(app.appData.TokenInfo.AccessToken)
+//		if err != nil {
+//			app.appData.Logger.ErrorLog.Printf("Error when create YaDisk %v", err)
+//			return
+//		}
+//		app.appData.YaDisk = &disk
+//	}
+//}
 
-func (app *Application) ensureTokenInfo() {
-	if isTokenEmpty(app.appData.TokenInfo) {
-		token, err := readToken()
-		if err != nil {
-			app.appData.Logger.ErrorLog.Printf("Error read token info %v", err)
-			return
-		}
-		app.appData.TokenInfo = token
-	}
-}
+//func (app *Application) ensureTokenInfo() {
+//	if yadiskoperate.isTokenEmpty(app.appData.TokenInfo) {
+//		token, err := yadiskoperate.readToken()
+//		if err != nil {
+//			app.appData.Logger.ErrorLog.Printf("Error read token info %v", err)
+//			return
+//		}
+//		app.appData.TokenInfo = token
+//	}
+//}
 
 func (app *Application) ensureHaApiClient() {
 	if app.appData.HaApi == nil {
@@ -289,30 +290,30 @@ func (app *Application) ensureHaApiClient() {
 	}
 }
 
-func (app *Application) refreshTokenIsNeed() bool {
-	if app.appData.TokenInfo.Expiry.After(time.Now().Add(time.Duration(240) * time.Hour)) {
-		app.appData.Logger.DebugLog.Printf("Not need refresh token")
-		return false
-	}
-
-	tokenInfo, err := RefreshToken(app.appData.Options.ClientId, app.appData.Options.ClientSecret, app.appData.TokenInfo)
-	if err != nil {
-		app.appData.Logger.ErrorLog.Printf("Error when refresh token %v", err)
-		return false
-	}
-	app.appData.Logger.InfoLog.Printf("%+v", tokenInfo)
-
-	err = writeToken(*tokenInfo)
-	if err != nil {
-		app.appData.Logger.ErrorLog.Printf("Error when write token %v", err)
-		return false
-	}
-
-	app.appData.TokenInfo = *tokenInfo
-	app.appData.Logger.InfoLog.Printf("Refresh token done")
-	app.ensureYandexDisk()
-	return true
-}
+//func (app *Application) refreshTokenIsNeed() bool {
+//	if app.appData.TokenInfo.Expiry.After(time.Now().Add(time.Duration(240) * time.Hour)) {
+//		app.appData.Logger.DebugLog.Printf("Not need refresh token")
+//		return false
+//	}
+//
+//	tokenInfo, err := yadiskoperate.RefreshToken(app.appData.Options.ClientId, app.appData.Options.ClientSecret, app.appData.TokenInfo)
+//	if err != nil {
+//		app.appData.Logger.ErrorLog.Printf("Error when refresh token %v", err)
+//		return false
+//	}
+//	app.appData.Logger.InfoLog.Printf("%+v", tokenInfo)
+//
+//	err = yadiskoperate.writeToken(*tokenInfo)
+//	if err != nil {
+//		app.appData.Logger.ErrorLog.Printf("Error when write token %v", err)
+//		return false
+//	}
+//
+//	app.appData.TokenInfo = *tokenInfo
+//	app.appData.Logger.InfoLog.Printf("Refresh token done")
+//	app.ensureYandexDisk()
+//	return true
+//}
 
 func (app *Application) downloadFile(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -366,15 +367,19 @@ func main() {
 		InfoLog:  infoLog,
 		DebugLog: debugLog}
 
+	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, &logger)
+
 	appData := &maintypes.AppData{
 		Options: options,
 		Logger:  &logger,
+		YaDP:    yaDP,
 	}
 
 	app := &Application{
 		appData: appData,
 	}
 
+	//TODO Надо убрать
 	router := mux.NewRouter()
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", fileServer))
@@ -388,11 +393,21 @@ func main() {
 	router.HandleFunc("/download/{fileName}", app.downloadFile).Methods("GET")
 
 	errorLog.Printf("(It is not error!!!) Run WEB-Server on http://127.0.0.1:%s", port)
+	//TODO Вот досюда
 
-	app.ensureTokenInfo()
-	app.refreshTokenIsNeed()
-	app.ensureYandexDisk()
+	yaDP.EnsureTokenInfo()
+	yaDP.RefreshTokenIsNeed()
+	yaDP.EnsureYandexDisk()
 	app.ensureHaApiClient()
+
+	// Создаем рест
+	restObj, err := rest.NewRest(port, app.appData.YaDP, app.appData.HaApi, &logger)
+	if err != nil {
+		logger.ErrorLog.Printf("Error create Rest %v", err)
+		panic(fmt.Sprintf("error create Rest %v", err))
+	}
+
+	app.appData.Rest = restObj
 
 	scheduler, err := gocron.NewScheduler(gocron.WithLocation(time.UTC),
 		gocron.WithLogger(
@@ -417,6 +432,6 @@ func main() {
 	infoLog.Printf("Add job for %s schedule", app.appData.Options.Schedule)
 	scheduler.Start()
 
-	err = http.ListenAndServe(":"+port, router)
+	err = app.appData.Rest.Start()
 	log.Fatal(err)
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 	"ybg/internal/maintypes"
+	"ybg/internal/pkg/yadiskoperate"
 	"ybg/internal/types"
 )
 
@@ -24,7 +25,7 @@ type ProcessedFilesResult struct {
 func GetFilesInfo(application *maintypes.AppData) ([]types.BackupFileInfo, error) {
 	application.Logger.DebugLog.Println("Start get files")
 	application.Logger.DebugLog.Printf("Token expiry %v", application.TokenInfo.Expiry)
-	remoteFiles, err := getRemoteFiles(application)
+	remoteFiles, err := yadiskoperate.getRemoteFiles(application)
 	if err != nil {
 		return make([]types.BackupFileInfo, 0), err
 	}
@@ -50,7 +51,7 @@ func UploadFiles(app *maintypes.AppData, files []types.ForUploadFileInfo) (Proce
 		destinationName := app.Options.RemotePath + "/" + file.RemoteFileName
 		sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
 		app.Logger.DebugLog.Printf("Try upload %s into %s", sourceName, destinationName)
-		err := uploadFile(app, sourceName, destinationName)
+		err := yadiskoperate.uploadFile(app, sourceName, destinationName)
 		if err != nil {
 			app.Logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
 			isError = true
@@ -81,7 +82,7 @@ func DeleteFiles(app *maintypes.AppData, files []types.ForDeleteFileInfo) (Proce
 	for _, file := range files {
 		remoteName := app.Options.RemotePath + "/" + file.RemoteFileName
 		app.Logger.DebugLog.Printf("Try delete %s", remoteName)
-		err := deleteFile(app, remoteName, file.MD5)
+		err := yadiskoperate.deleteFile(app, remoteName, file.MD5)
 		if err != nil {
 			app.Logger.ErrorLog.Printf("Error when delete file %s. Err: %s", remoteName, err)
 			isError = true

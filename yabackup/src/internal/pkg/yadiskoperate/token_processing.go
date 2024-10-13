@@ -1,4 +1,4 @@
-package main
+package yadiskoperate
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"time"
 	"ybg/internal/types"
 )
+
+const FILE_PATH_TOKEN = "/data/tokenInfo.json"
 
 func GetCheckCodeUrl(clientId string) string {
 	return "https://oauth.yandex.ru/authorize?response_type=code&client_id=" + clientId
