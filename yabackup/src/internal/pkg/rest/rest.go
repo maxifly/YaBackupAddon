@@ -46,13 +46,14 @@ func NewRest(port string,
 	logger *mylogger.Logger) (*Rest, error) {
 
 	router := mux.NewRouter()
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
+	fileServer := http.FileServer(http.Dir("./internal/pkg/rest/ui/static/"))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", fileServer))
 	restObj := Rest{port: port,
 		yaDProcessor: yaDProcessor,
 		bKProcessor:  bKProcessor,
 		haApi:        haApi,
 		theme:        theme,
+		router:       router,
 		logger:       logger}
 
 	router.HandleFunc("/", restObj.indexHandler).Methods("GET")
@@ -79,8 +80,8 @@ func (app *Rest) isUseDarkTheme() bool {
 func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 	app.logger.InfoLog.Println("indexHandler")
 	files := []string{
-		"./ui/html/index.html",
-		"./ui/html/base.html",
+		"./internal/pkg/rest/ui/html/index.html",
+		"./internal/pkg/rest/ui/html/base.html",
 	}
 
 	ts, err := template.ParseFiles(files...)
@@ -119,8 +120,8 @@ func (app *Rest) getTokenForm(w http.ResponseWriter, r *http.Request) {
 func (app *Rest) renderTokenForm(w http.ResponseWriter, r *http.Request, errorMessage string) {
 	app.logger.InfoLog.Println("getTokenForm")
 	files := []string{
-		"./ui/html/get_token.html",
-		"./ui/html/base.html",
+		"./internal/pkg/rest/ui/html/get_token.html",
+		"./internal/pkg/rest/ui/html/base.html",
 	}
 
 	ts, err := template.ParseFiles(files...)
@@ -167,8 +168,8 @@ func (app *Rest) getToken(w http.ResponseWriter, r *http.Request) {
 func (app *Rest) startUpload(w http.ResponseWriter, r *http.Request) {
 	app.logger.InfoLog.Println("startUpload")
 	files := []string{
-		"./ui/html/start_upload.html",
-		"./ui/html/base.html",
+		"./internal/pkg/rest/ui/html/start_upload.html",
+		"./internal/pkg/rest/ui/html/base.html",
 	}
 	ts, err := template.ParseFiles(files...)
 	if err != nil {
