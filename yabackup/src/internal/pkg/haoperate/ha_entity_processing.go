@@ -15,7 +15,7 @@ import (
 
 const (
 	BaseURL  string = "http://supervisor/core/api"
-	EntityId string = "sensor.yba_test"
+	EntityId string = "sensor.ybba_test"
 )
 
 type HaApiClient struct {
@@ -113,7 +113,12 @@ type EntityAttributes struct {
 	LastUploadTime    CustomTime `json:"last_upload_time"`
 }
 
-type SetEntityStateRequest struct {
+type setEntityStateRequest struct {
+	State      Status           `json:"state"`
+	Attributes EntityAttributes `json:"attributes"`
+}
+
+type getEntityStateRequest struct {
 	State      Status           `json:"state"`
 	Attributes EntityAttributes `json:"attributes"`
 }
@@ -130,7 +135,7 @@ func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 	haApi.logger.DebugLog.Println("Set entity request")
 	url := fmt.Sprintf("%s/states/%s", BaseURL, EntityId)
 
-	data := SetEntityStateRequest{
+	data := setEntityStateRequest{
 		State: entityState.State,
 		Attributes: EntityAttributes{
 			OkUploadAmount:    entityState.OkUpload,
@@ -189,4 +194,71 @@ func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 		return resultError
 	}
 	return nil
+}
+
+func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
+	haApi.logger.DebugLog.Println("Get entity request")
+	url := fmt.Sprintf("%s/states/%s", BaseURL, EntityId)
+
+	// Создаем новый HTTP-запрос
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		resultError := fmt.Errorf("error when create request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	// Устанавливаем заголовок авторизации
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
+	req.Header.Set("Accept", "application/json") // Ожидание ответа в формате JSON
+
+	// Выполняем запрос
+	resp, err := haApi.httpClient.Do(req)
+	if err != nil {
+		resultError := fmt.Errorf("error when execute request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	defer resp.Body.Close()
+
+	// Проверяем статус код
+	if resp.StatusCode == http.StatusNotFound {
+		haApi.logger.InfoLog.Println("Entity not found")
+		return nil, nil
+	} else if resp.StatusCode != http.StatusOK {
+		resultError := fmt.Errorf("failed to fetch data: %s", resp.Status)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	// Читаем тело ответа
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		resultError := fmt.Errorf("error when read body: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	// Декодируем JSON-ответ
+	var sensor getEntityStateRequest
+	if err := json.Unmarshal(body, &sensor); err != nil {
+		resultError := fmt.Errorf("error when parse body: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	entityState := EntityState{
+		State:            sensor.State,
+		OkUpload:         sensor.Attributes.OkUploadAmount,
+		ErrorUpload:      sensor.Attributes.ErrorUploadAmount,
+		OkDelete:         sensor.Attributes.OkDeleteAmount,
+		ErrorDelete:      sensor.Attributes.ErrorDeleteAmount,
+		LocalSize:        types.FileSize(sensor.Attributes.LocalFileSize),
+		RemoteSize:       types.FileSize(sensor.Attributes.RemoteFileSize),
+		RemoteFreeSpace:  types.FileSize(sensor.Attributes.RemoteFreeSpace),
+		LastUploadedTime: sensor.Attributes.LastUploadTime,
+	}
+
+	return &entityState, nil
 }

@@ -105,6 +105,11 @@ func main() {
 		//panic(fmt.Sprintf("error create HaApiClient %v", err))
 	}
 
+	// Test
+	state, err := haApi.GetEntityState()
+
+	logger.ErrorLog.Printf("Test result %v %v", state, err)
+
 	// Создаем рест
 	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, &logger)
 	if err != nil {

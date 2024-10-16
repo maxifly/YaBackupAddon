@@ -104,6 +104,52 @@ func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 		alertMessages = append(alertMessages, AlertMessage{Message: err.Error()})
 	}
 
+	// Calculate data for entity state
+	localFileSize := types.FileSize(0)
+	remoteFileSize := types.FileSize(0)
+
+	// Get file sizes for start state
+	for _, file := range filesInfo {
+		if file.IsRemote {
+			remoteFileSize += file.GeneralInfo.Size
+		}
+
+		if file.IsLocal {
+			localFileSize += file.GeneralInfo.Size
+		}
+	}
+
+	// Get disk info
+	diskInfo, err := app.yaDProcessor.GetDiskInfo()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error get disk info %s", err)
+	}
+
+	// Update entity state
+	entityState, err := app.haApi.GetEntityState()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error read entity state %s", err)
+	}
+
+	if entityState == nil {
+		entityState = &haoperate.EntityState{
+			State:           haoperate.OK,
+			LocalSize:       localFileSize,
+			RemoteSize:      remoteFileSize,
+			RemoteFreeSpace: diskInfo.TotalSpace - diskInfo.UsedSpace,
+		}
+	} else {
+		entityState.LocalSize = localFileSize
+		entityState.RemoteSize = remoteFileSize
+		entityState.RemoteFreeSpace = diskInfo.TotalSpace - diskInfo.UsedSpace
+	}
+
+	err = app.haApi.SetEntityState(
+		*entityState)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error save entity state %s", err)
+	}
+
 	data := BackupResponse{BFiles: filesInfo, AlertMessages: alertMessages, IsDarkTheme: app.isUseDarkTheme()}
 
 	err = ts.Execute(w, data)
@@ -255,8 +301,14 @@ func UploadTask(app *Rest) {
 		state = haoperate.ERROR
 	}
 
-	err = app.haApi.SetEntityState(
-		haoperate.EntityState{
+	// Update entity state
+	entityState, err := app.haApi.GetEntityState()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error read entity state %s", err)
+	}
+
+	if entityState == nil {
+		entityState = &haoperate.EntityState{
 			State:            state,
 			OkUpload:         uploadResult.Ok,
 			ErrorUpload:      uploadResult.Error,
@@ -266,7 +318,22 @@ func UploadTask(app *Rest) {
 			RemoteSize:       remoteFileSize,
 			RemoteFreeSpace:  diskInfo.TotalSpace - diskInfo.UsedSpace,
 			LastUploadedTime: haoperate.CustomTime{Time: time.Now()},
-		})
+		}
+	} else {
+		entityState.State = state
+		entityState.OkUpload = uploadResult.Ok
+		entityState.ErrorUpload = uploadResult.Error
+		entityState.OkDelete = deletedResult.Ok
+		entityState.ErrorDelete = deletedResult.Error
+		entityState.LocalSize = localFileSize
+		entityState.RemoteSize = remoteFileSize
+		entityState.RemoteFreeSpace = diskInfo.TotalSpace - diskInfo.UsedSpace
+		entityState.LastUploadedTime = haoperate.CustomTime{Time: time.Now()}
+
+	}
+
+	err = app.haApi.SetEntityState(
+		*entityState)
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error save entity state %s", err)
 	}
