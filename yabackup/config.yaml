@@ -34,6 +34,7 @@ schema:
   schedule: str
   log_level: "list(DEBUG|INFO|WARNING|ERROR)"
   theme: "list(Light|Dark)"
+  entity_id: "str?"
 
 startup: before
 

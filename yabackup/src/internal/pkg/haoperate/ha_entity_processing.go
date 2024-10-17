@@ -14,11 +14,13 @@ import (
 )
 
 const (
-	BaseURL  string = "http://supervisor/core/api"
-	EntityId string = "sensor.ybba_test"
+	BaseURL         string = "http://supervisor/core/api"
+	EntityIdPrefix  string = "sensor."
+	DefaultEntityId string = "ydbk"
 )
 
 type HaApiClient struct {
+	entity_id  string
 	ctx        context.Context
 	httpClient *http.Client
 	token      string
@@ -123,17 +125,21 @@ type getEntityStateRequest struct {
 	Attributes EntityAttributes `json:"attributes"`
 }
 
-func NewHaApi(ctx context.Context, client *http.Client, token string, logger *mylogger.Logger) (*HaApiClient, error) {
+func NewHaApi(entity_id string, ctx context.Context, client *http.Client, token string, logger *mylogger.Logger) (*HaApiClient, error) {
 	if token == "" {
 		return nil, errors.New("required token")
 	}
 
-	return &HaApiClient{ctx: ctx, httpClient: client, token: token, logger: logger}, nil
+	if entity_id == "" {
+		entity_id = DefaultEntityId
+	}
+	entity_id = EntityIdPrefix + entity_id
+	return &HaApiClient{entity_id: entity_id, ctx: ctx, httpClient: client, token: token, logger: logger}, nil
 }
 
 func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 	haApi.logger.DebugLog.Println("Set entity request")
-	url := fmt.Sprintf("%s/states/%s", BaseURL, EntityId)
+	url := fmt.Sprintf("%s/states/%s", BaseURL, haApi.entity_id)
 
 	data := setEntityStateRequest{
 		State: entityState.State,
@@ -198,7 +204,7 @@ func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 
 func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
 	haApi.logger.DebugLog.Println("Get entity request")
-	url := fmt.Sprintf("%s/states/%s", BaseURL, EntityId)
+	url := fmt.Sprintf("%s/states/%s", BaseURL, haApi.entity_id)
 
 	// Создаем новый HTTP-запрос
 	req, err := http.NewRequest("GET", url, nil)

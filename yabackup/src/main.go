@@ -1,55 +1,9 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"github.com/go-co-op/gocron/v2"
-	"log"
-	"net/http"
 	"os"
-	"time"
-	"ybg/internal/pkg/bkoperate"
-	"ybg/internal/pkg/haoperate"
-	"ybg/internal/pkg/mylogger"
-	"ybg/internal/pkg/rest"
-	"ybg/internal/pkg/yadiskoperate"
+	"ybg/internal/appybg"
 )
-
-const FILE_PATH_OPTIONS = "/data/options.json"
-
-type ApplOptions struct {
-	ClientId                   string `json:"client_id"`
-	ClientSecret               string `json:"client_secret"`
-	RemotePath                 string `json:"remote_path"`
-	RemoteMaximumFilesQuantity int    `json:"remote_maximum_files_quantity"`
-	Schedule                   string `json:"schedule"`
-	LogLevel                   string `json:"log_level"`
-	Theme                      string `json:"theme" default:"Light"`
-}
-
-func readOptions() (ApplOptions, error) {
-	plan, _ := os.ReadFile(FILE_PATH_OPTIONS)
-	var data ApplOptions
-	err := json.Unmarshal(plan, &data)
-	return data, err
-}
-
-func createHaApiClient(logger *mylogger.Logger) (*haoperate.HaApiClient, error) {
-
-	supervisorToken := os.Getenv("SUPERVISOR_TOKEN")
-	if supervisorToken == "" {
-		logger.ErrorLog.Println("Supervisor token not found")
-		return nil, fmt.Errorf("supervisor token not found")
-	}
-
-	api, err := haoperate.NewHaApi(context.Background(), http.DefaultClient, supervisorToken, logger)
-	if err != nil {
-		logger.ErrorLog.Printf("Error when create ha_api client: %v", err)
-		return nil, fmt.Errorf("error when create ha_api client: %v", err)
-	}
-	return api, nil
-}
 
 func main() {
 	port := os.Getenv("PORT")
@@ -57,89 +11,9 @@ func main() {
 		port = "8099"
 	}
 
-	logFormat := log.Ldate | log.Ltime | log.Lshortfile
+	app := appybg.NewYbg(port)
 
-	debugLog := log.New(mylogger.NewNullWriter(), "DEBUG\t", logFormat)
-	infoLog := log.New(mylogger.NewNullWriter(), "INFO\t", logFormat)
-	errorLog := log.New(os.Stderr, "ERROR\t", logFormat)
+	defer app.Stop()
 
-	scheduleLogLevel := gocron.LogLevelWarn
-
-	// Test log messages
-
-	options, err := readOptions()
-	if err != nil {
-		panic(fmt.Sprintf("Can not read Options: %v", err))
-	}
-
-	if options.LogLevel == "DEBUG" {
-		debugLog = log.New(os.Stdout, "DEBUG\t", logFormat)
-		infoLog = log.New(os.Stdout, "INFO\t", logFormat)
-		scheduleLogLevel = gocron.LogLevelDebug
-
-	}
-	if options.LogLevel == "INFO" {
-		infoLog = log.New(os.Stdout, "INFO\t", logFormat)
-		scheduleLogLevel = gocron.LogLevelInfo
-	}
-
-	debugLog.Println("hello")
-	infoLog.Println("hello")
-	errorLog.Println("hello")
-
-	// Инициализируем новую структуру с зависимостями приложения.
-	logger := mylogger.Logger{ErrorLog: errorLog,
-		InfoLog:  infoLog,
-		DebugLog: debugLog}
-
-	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
-	bkP := bkoperate.NewBkProcessor(yaDP, options.RemoteMaximumFilesQuantity, &logger)
-
-	yaDP.EnsureTokenInfo()
-	yaDP.RefreshTokenIsNeed()
-	yaDP.EnsureYandexDisk()
-	haApi, err := createHaApiClient(&logger)
-
-	if err != nil {
-		logger.ErrorLog.Printf("Error create HaApiClient %v", err)
-		//panic(fmt.Sprintf("error create HaApiClient %v", err))
-	}
-
-	// Test
-	state, err := haApi.GetEntityState()
-
-	logger.ErrorLog.Printf("Test result %v %v", state, err)
-
-	// Создаем рест
-	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, &logger)
-	if err != nil {
-		logger.ErrorLog.Printf("Error create Rest %v", err)
-		panic(fmt.Sprintf("error create Rest %v", err))
-	}
-
-	scheduler, err := gocron.NewScheduler(gocron.WithLocation(time.UTC),
-		gocron.WithLogger(
-			gocron.NewLogger(scheduleLogLevel),
-		))
-	defer func() { _ = scheduler.Shutdown() }()
-
-	_, err = scheduler.NewJob(
-		gocron.CronJob(
-			// standard cron tab parsing
-			options.Schedule,
-			false,
-		),
-		gocron.NewTask(
-			func() { rest.UploadTask(restObj) },
-		),
-	)
-
-	if err != nil {
-		errorLog.Printf("Error when create upload task job. %v", err)
-	}
-	infoLog.Printf("Add job for %s schedule", options.Schedule)
-	scheduler.Start()
-
-	err = restObj.Start()
-	log.Fatal(err)
+	app.Start()
 }
