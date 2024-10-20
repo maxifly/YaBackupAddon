@@ -1,9 +1,8 @@
-package main
+package types
 
-import "time"
-
-type fileSize int64
-type fileModified time.Time
+import (
+	"time"
+)
 
 type TokenInfo struct {
 	AccessToken  string    `json:"access_token"`
@@ -11,10 +10,15 @@ type TokenInfo struct {
 	Expiry       time.Time `json:"expiry,omitempty"`
 }
 
+type DiskInfo struct {
+	TotalSpace FileSize
+	UsedSpace  FileSize
+}
+
 type GeneralFileInfo struct {
 	Name     string
-	Size     fileSize
-	Modified fileModified
+	Size     FileSize
+	Modified FileModified
 }
 
 type RemoteFileInfo GeneralFileInfo
@@ -44,5 +48,6 @@ type ForUploadFileInfo struct {
 }
 type ForDeleteFileInfo struct {
 	RemoteFileName string
+	FileInfo       GeneralFileInfo
 	MD5            string
 }

@@ -1,2 +1,3 @@
+#!/usr/bin/with-contenv bashio
 cd yabackup
-./YBG >> ybg.log 2>&1
+./ybg >> ybg.log 2>&1

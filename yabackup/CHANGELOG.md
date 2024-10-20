@@ -1,4 +1,8 @@
 # Changelog
+## 2.0.4-b
+- Add entity sensor.yandex_backup_state
+- Refactoring
+
 ## 2.0.3
 - Up upload-big-file library version [#12](https://github.com/maxifly/YaBackupAddon/issues/12)
 

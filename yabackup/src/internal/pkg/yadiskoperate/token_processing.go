@@ -1,4 +1,4 @@
-package main
+package yadiskoperate
 
 import (
 	"context"
@@ -8,13 +8,16 @@ import (
 	"golang.org/x/oauth2/yandex"
 	"os"
 	"time"
+	"ybg/internal/types"
 )
+
+const FILE_PATH_TOKEN = "/data/tokenInfo.json"
 
 func GetCheckCodeUrl(clientId string) string {
 	return "https://oauth.yandex.ru/authorize?response_type=code&client_id=" + clientId
 }
 
-func CreateToken(clientId string, clientSecret string, code string) (TokenInfo, error) {
+func CreateToken(clientId string, clientSecret string, code string) (types.TokenInfo, error) {
 
 	config := oauth2.Config{
 		ClientID:     clientId,
@@ -24,15 +27,15 @@ func CreateToken(clientId string, clientSecret string, code string) (TokenInfo, 
 
 	tokenValue, err := config.Exchange(context.Background(), code)
 	if err != nil {
-		return *new(TokenInfo), nil
+		return *new(types.TokenInfo), nil
 	}
-	tokenInfo := TokenInfo{AccessToken: tokenValue.AccessToken,
+	tokenInfo := types.TokenInfo{AccessToken: tokenValue.AccessToken,
 		RefreshToken: tokenValue.RefreshToken,
 		Expiry:       tokenValue.Expiry}
 	return tokenInfo, err
 }
 
-func RefreshToken(clientId string, clientSecret string, tokenInfo TokenInfo) (*TokenInfo, error) {
+func RefreshToken(clientId string, clientSecret string, tokenInfo types.TokenInfo) (*types.TokenInfo, error) {
 
 	config := oauth2.Config{
 		ClientID:     clientId,
@@ -56,12 +59,12 @@ func RefreshToken(clientId string, clientSecret string, tokenInfo TokenInfo) (*T
 		return nil, fmt.Errorf("can not refresh token")
 	}
 
-	return &TokenInfo{AccessToken: newToken.AccessToken,
+	return &types.TokenInfo{AccessToken: newToken.AccessToken,
 		RefreshToken: newToken.RefreshToken,
 		Expiry:       newToken.Expiry}, nil
 }
 
-func writeToken(tokenInfo TokenInfo) error {
+func writeToken(tokenInfo types.TokenInfo) error {
 	jsonData, err := json.Marshal(tokenInfo)
 	if err != nil {
 		return err
@@ -75,18 +78,18 @@ func writeToken(tokenInfo TokenInfo) error {
 	return nil
 }
 
-func readToken() (TokenInfo, error) {
+func readToken() (types.TokenInfo, error) {
 	plan, _ := os.ReadFile(FILE_PATH_TOKEN)
-	var data TokenInfo
+	var data types.TokenInfo
 	err := json.Unmarshal(plan, &data)
 	return data, err
 }
 
-func isTokenEmpty(tokenInfo TokenInfo) bool {
+func isTokenEmpty(tokenInfo types.TokenInfo) bool {
 	return tokenInfo.AccessToken == "" || tokenInfo.RefreshToken == ""
 }
 
-func isTokenValid(tokenInfo TokenInfo) bool {
+func isTokenValid(tokenInfo types.TokenInfo) bool {
 	token := oauth2.Token{AccessToken: tokenInfo.AccessToken,
 		RefreshToken: tokenInfo.RefreshToken,
 		Expiry:       tokenInfo.Expiry}
