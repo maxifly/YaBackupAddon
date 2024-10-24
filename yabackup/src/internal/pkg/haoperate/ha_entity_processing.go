@@ -8,15 +8,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
 
 const (
-	BaseURL         string = "http://supervisor/core/api"
-	EntityIdPrefix  string = "sensor."
-	DefaultEntityId string = "yandex_backup_state"
+	BaseURL           string = "http://supervisor/core/api"
+	EntityIdPrefix    string = "sensor."
+	DefaultEntityId   string = "yandex_backup_state"
+	local_entity_copy string = "/data/entity-copy.json"
 )
 
 type HaApiClient struct {
@@ -124,7 +126,7 @@ type setEntityStateRequest struct {
 	Attributes EntityAttributes `json:"attributes"`
 }
 
-type getEntityStateRequest struct {
+type getEntityStateResponse struct {
 	State      Status           `json:"state"`
 	Attributes EntityAttributes `json:"attributes"`
 }
@@ -205,6 +207,12 @@ func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 		haApi.logger.ErrorLog.Println(resultError)
 		return resultError
 	}
+
+	// Сделаем локальную копию
+	err = writeLocalEntityCopy(data)
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error write local state entity copy %v", err)
+	}
 	return nil
 }
 
@@ -253,26 +261,79 @@ func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
 	}
 
 	// Декодируем JSON-ответ
-	var sensor getEntityStateRequest
+	var sensor getEntityStateResponse
 	if err := json.Unmarshal(body, &sensor); err != nil {
 		resultError := fmt.Errorf("error when parse body: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
 		return nil, resultError
 	}
 
-	entityState := EntityState{
-		State:            sensor.State,
-		OkUpload:         sensor.Attributes.OkUploadAmount,
-		ErrorUpload:      sensor.Attributes.ErrorUploadAmount,
-		OkDelete:         sensor.Attributes.OkDeleteAmount,
-		ErrorDelete:      sensor.Attributes.ErrorDeleteAmount,
-		LocalFiles:       sensor.Attributes.LocalFiles,
-		RemoteFiles:      sensor.Attributes.RemoteFiles,
-		LocalSize:        types.FileSize(sensor.Attributes.LocalFileSize),
-		RemoteSize:       types.FileSize(sensor.Attributes.RemoteFileSize),
-		RemoteFreeSpace:  types.FileSize(sensor.Attributes.RemoteFreeSpace),
-		LastUploadedTime: sensor.Attributes.LastUploadTime,
+	entityState := NewEntityState(sensor.State, sensor.Attributes)
+
+	return entityState, nil
+}
+
+func (haApi *HaApiClient) EnsureEntityState() error {
+	state, err := haApi.GetEntityState()
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error read current state entity %v", err)
 	}
 
-	return &entityState, nil
+	if state != nil {
+		return nil
+	}
+
+	entityCopy, err := readLocalEntityCopy()
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error read current state entity local copy %v", err)
+		return err
+	}
+
+	entityStateCopy := NewEntityState(entityCopy.State, entityCopy.Attributes)
+
+	err = haApi.SetEntityState(*entityStateCopy)
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error write state entity from local copy %v", err)
+		return err
+	}
+
+	return nil
+
+}
+
+func NewEntityState(state Status, attributes EntityAttributes) *EntityState {
+	return &EntityState{
+		State:            state,
+		OkUpload:         attributes.OkUploadAmount,
+		ErrorUpload:      attributes.ErrorUploadAmount,
+		OkDelete:         attributes.OkDeleteAmount,
+		ErrorDelete:      attributes.ErrorDeleteAmount,
+		LocalFiles:       attributes.LocalFiles,
+		RemoteFiles:      attributes.RemoteFiles,
+		LocalSize:        types.FileSize(attributes.LocalFileSize),
+		RemoteSize:       types.FileSize(attributes.RemoteFileSize),
+		RemoteFreeSpace:  types.FileSize(attributes.RemoteFreeSpace),
+		LastUploadedTime: attributes.LastUploadTime,
+	}
+}
+
+func writeLocalEntityCopy(entityState setEntityStateRequest) error {
+	jsonData, err := json.Marshal(entityState)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(local_entity_copy, jsonData, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func readLocalEntityCopy() (setEntityStateRequest, error) {
+	plan, _ := os.ReadFile(local_entity_copy)
+	var data setEntityStateRequest
+	err := json.Unmarshal(plan, &data)
+	return data, err
 }

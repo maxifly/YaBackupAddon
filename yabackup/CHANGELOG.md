@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.4
+- Restore state entity after addon restart [#14](https://github.com/maxifly/YaBackupAddon/issues/14)
+
 ## 2.0.4-b
 - Add entity sensor.yandex_backup_state
 - Refactoring
