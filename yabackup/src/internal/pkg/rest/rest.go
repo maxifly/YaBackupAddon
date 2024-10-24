@@ -132,7 +132,7 @@ func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 	// Update entity state
 	entityState, err := app.haApi.GetEntityState()
 	if err != nil {
-		app.logger.ErrorLog.Printf("Error read entity state %s", err)
+		app.logger.ErrorLog.Printf("Error read state entity %s", err)
 	}
 
 	if entityState == nil {

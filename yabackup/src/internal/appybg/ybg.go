@@ -17,10 +17,12 @@ import (
 )
 
 const FILE_PATH_OPTIONS = "/data/options.json"
+const restoreStateEntityInterval time.Duration = 1800
 
 type YbgApp struct {
 	options          ApplOptions
 	restObj          *rest.Rest
+	haApi            *haoperate.HaApiClient
 	logger           *mylogger.Logger
 	scheduleLogLevel gocron.LogLevel
 	scheduler        gocron.Scheduler
@@ -97,10 +99,12 @@ func NewYbg(port string) *YbgApp {
 		options:          options,
 		scheduleLogLevel: scheduleLogLevel,
 		logger:           &logger,
-		restObj:          restObj}
+		restObj:          restObj,
+		haApi:            haApi}
 }
 
 func (app *YbgApp) Start() {
+
 	scheduler, err := gocron.NewScheduler(gocron.WithLocation(time.UTC),
 		gocron.WithLogger(
 			gocron.NewLogger(app.scheduleLogLevel),
@@ -124,12 +128,46 @@ func (app *YbgApp) Start() {
 	app.logger.InfoLog.Printf("Add job for %s schedule", app.options.Schedule)
 	app.scheduler.Start()
 
+	restoreEntityTask := func() bool {
+		err := app.haApi.EnsureEntityState()
+		if err != nil {
+			app.logger.ErrorLog.Printf("Error restore state entity %v", err)
+			return false
+		}
+		return true
+	}
+
+	await(restoreEntityTask, app.logger, restoreStateEntityInterval)
+
 	err = app.restObj.Start()
 	log.Fatal(err)
 }
 
 func (app *YbgApp) Stop() {
 	_ = app.scheduler.Shutdown()
+}
+
+func await(task func() bool,
+	logger *mylogger.Logger,
+	timeIntervalSec time.Duration) {
+	cutOfTime := time.Now().Add(timeIntervalSec * time.Second)
+
+	go func() {
+		result := false
+		for {
+			if time.Now().After(cutOfTime) {
+				logger.ErrorLog.Printf("Task completed unsuccessfully by cut of time")
+				break
+			}
+			result = task()
+			if result {
+				logger.InfoLog.Printf("Task completed successfully")
+				break
+			}
+			logger.ErrorLog.Printf("Task iteration unsuccessfully")
+			time.Sleep(5 * time.Second)
+		}
+	}()
 }
 
 func readOptions() (ApplOptions, error) {
