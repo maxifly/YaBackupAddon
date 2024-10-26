@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	BaseURL           string = "http://supervisor/core/api"
-	EntityIdPrefix    string = "sensor."
-	DefaultEntityId   string = "yandex_backup_state"
-	local_entity_copy string = "/data/entity-copy.json"
+	BaseURL             string = "http://supervisor/core/api"
+	EntityIdPrefix      string = "sensor."
+	DefaultEntityId     string = "yandex_backup_state"
+	localEntityCopyPath string = "/data/entity-copy.json"
 )
 
 type HaApiClient struct {
@@ -144,76 +144,7 @@ func NewHaApi(entity_id string, ctx context.Context, client *http.Client, token 
 }
 
 func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
-	haApi.logger.DebugLog.Println("Set entity request")
-	url := fmt.Sprintf("%s/states/%s", BaseURL, haApi.entity_id)
-
-	data := setEntityStateRequest{
-		State: entityState.State,
-		Attributes: EntityAttributes{
-			OkUploadAmount:    entityState.OkUpload,
-			ErrorUploadAmount: entityState.ErrorUpload,
-			OkDeleteAmount:    entityState.OkDelete,
-			ErrorDeleteAmount: entityState.ErrorDelete,
-			RemoteFiles:       entityState.RemoteFiles,
-			LocalFiles:        entityState.LocalFiles,
-			RemoteFileSize:    int64(entityState.RemoteSize),
-			LocalFileSize:     int64(entityState.LocalSize),
-			RemoteFreeSpace:   int64(entityState.RemoteFreeSpace),
-			LastUploadTime:    entityState.LastUploadedTime,
-		},
-	}
-
-	// Преобразуем структуру в JSON
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		resultError := fmt.Errorf("error when data marshalling: %v", err)
-		haApi.logger.ErrorLog.Println(resultError)
-		return resultError
-	}
-
-	// Выполняем POST запрос
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		resultError := fmt.Errorf("error when create request: %v", err)
-		haApi.logger.ErrorLog.Println(resultError)
-		return resultError
-	}
-
-	// Устанавливаем заголовок Content-Type
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
-
-	haApi.logger.DebugLog.Printf("Send request %v", req)
-	// Отправляем запрос
-	resp, err := haApi.httpClient.Do(req)
-	if err != nil {
-		resultError := fmt.Errorf("error when execute request: %v", err)
-		haApi.logger.ErrorLog.Println(resultError)
-		return resultError
-	}
-	defer resp.Body.Close()
-
-	// Проверяем статус ответа
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		haApi.logger.ErrorLog.Println("Ошибка при чтении ответа: %v", err)
-	}
-
-	haApi.logger.DebugLog.Printf("Request result %d: %s", resp.StatusCode, body)
-
-	if resp.StatusCode >= 400 {
-		resultError := fmt.Errorf("request perform with error: %d and body %s", resp.StatusCode, body)
-		haApi.logger.ErrorLog.Println(resultError)
-		return resultError
-	}
-
-	// Сделаем локальную копию
-	err = writeLocalEntityCopy(data)
-	if err != nil {
-		haApi.logger.ErrorLog.Printf("Error write local state entity copy %v", err)
-	}
-	return nil
+	return haApi.innerSetEntityState(entityState, true)
 }
 
 func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
@@ -274,15 +205,18 @@ func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
 }
 
 func (haApi *HaApiClient) EnsureEntityState() error {
+	haApi.logger.DebugLog.Printf("Check state entity existence")
 	state, err := haApi.GetEntityState()
 	if err != nil {
 		haApi.logger.ErrorLog.Printf("Error read current state entity %v", err)
 	}
 
 	if state != nil {
+		haApi.logger.DebugLog.Printf("State entity already exists")
 		return nil
 	}
 
+	haApi.logger.DebugLog.Printf("State entity not exists")
 	entityCopy, err := readLocalEntityCopy()
 	if err != nil {
 		haApi.logger.ErrorLog.Printf("Error read current state entity local copy %v", err)
@@ -291,14 +225,94 @@ func (haApi *HaApiClient) EnsureEntityState() error {
 
 	entityStateCopy := NewEntityState(entityCopy.State, entityCopy.Attributes)
 
-	err = haApi.SetEntityState(*entityStateCopy)
+	err = haApi.innerSetEntityState(*entityStateCopy, false)
 	if err != nil {
 		haApi.logger.ErrorLog.Printf("Error write state entity from local copy %v", err)
 		return err
 	}
 
+	haApi.logger.InfoLog.Printf("State entity restored")
+
 	return nil
 
+}
+
+func (haApi *HaApiClient) innerSetEntityState(entityState EntityState, saveLocalCopy bool) error {
+	haApi.logger.DebugLog.Println("Set entity")
+
+	url := fmt.Sprintf("%s/states/%s", BaseURL, haApi.entity_id)
+
+	data := setEntityStateRequest{
+		State: entityState.State,
+		Attributes: EntityAttributes{
+			OkUploadAmount:    entityState.OkUpload,
+			ErrorUploadAmount: entityState.ErrorUpload,
+			OkDeleteAmount:    entityState.OkDelete,
+			ErrorDeleteAmount: entityState.ErrorDelete,
+			RemoteFiles:       entityState.RemoteFiles,
+			LocalFiles:        entityState.LocalFiles,
+			RemoteFileSize:    int64(entityState.RemoteSize),
+			LocalFileSize:     int64(entityState.LocalSize),
+			RemoteFreeSpace:   int64(entityState.RemoteFreeSpace),
+			LastUploadTime:    entityState.LastUploadedTime,
+		},
+	}
+
+	if saveLocalCopy {
+		// Сделаем локальную копию
+		haApi.logger.DebugLog.Printf("Save state entity local copy")
+		err := writeLocalEntityCopy(data)
+		if err != nil {
+			haApi.logger.ErrorLog.Printf("Error write local state entity copy %v", err)
+		}
+	}
+
+	// Преобразуем структуру в JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		resultError := fmt.Errorf("error when data marshalling: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return resultError
+	}
+
+	// Выполняем POST запрос
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		resultError := fmt.Errorf("error when create request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return resultError
+	}
+
+	// Устанавливаем заголовок Content-Type
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
+
+	haApi.logger.DebugLog.Printf("Send request %v", req)
+	// Отправляем запрос
+	resp, err := haApi.httpClient.Do(req)
+	if err != nil {
+		resultError := fmt.Errorf("error when execute request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return resultError
+	}
+	defer resp.Body.Close()
+
+	// Проверяем статус ответа
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		haApi.logger.ErrorLog.Println("Ошибка при чтении ответа: %v", err)
+	}
+
+	haApi.logger.DebugLog.Printf("Request result %d: %s", resp.StatusCode, body)
+
+	if resp.StatusCode >= 400 {
+		resultError := fmt.Errorf("request perform with error: %d and body %s", resp.StatusCode, body)
+		haApi.logger.ErrorLog.Println(resultError)
+		return resultError
+	}
+
+	return nil
 }
 
 func NewEntityState(state Status, attributes EntityAttributes) *EntityState {
@@ -323,7 +337,7 @@ func writeLocalEntityCopy(entityState setEntityStateRequest) error {
 		return err
 	}
 
-	err = os.WriteFile(local_entity_copy, jsonData, 0644)
+	err = os.WriteFile(localEntityCopyPath, jsonData, 0644)
 	if err != nil {
 		return err
 	}
@@ -332,7 +346,7 @@ func writeLocalEntityCopy(entityState setEntityStateRequest) error {
 }
 
 func readLocalEntityCopy() (setEntityStateRequest, error) {
-	plan, _ := os.ReadFile(local_entity_copy)
+	plan, _ := os.ReadFile(localEntityCopyPath)
 	var data setEntityStateRequest
 	err := json.Unmarshal(plan, &data)
 	return data, err
