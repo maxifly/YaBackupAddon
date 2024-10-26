@@ -18,6 +18,7 @@ import (
 
 const FILE_PATH_OPTIONS = "/data/options.json"
 const restoreStateEntityInterval time.Duration = 1800
+const restoreStateEntitySchedule = "*/30 * * * * *"
 
 type YbgApp struct {
 	options          ApplOptions
@@ -125,8 +126,33 @@ func (app *YbgApp) Start() {
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error when create upload task job. %v", err)
 	}
-	app.logger.InfoLog.Printf("Add job for %s schedule", app.options.Schedule)
-	app.scheduler.Start()
+	app.logger.InfoLog.Printf("Add upload job for to %s schedule", app.options.Schedule)
+
+	_, err = app.scheduler.NewJob(
+		gocron.CronJob(
+			// standard cron tab parsing
+			restoreStateEntitySchedule,
+			true,
+		),
+		gocron.NewTask(
+			func() {
+				err := app.haApi.EnsureEntityState()
+				if err != nil {
+					app.logger.ErrorLog.Printf("Error when restore entity state. %v", err)
+				}
+			},
+		),
+	)
+
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when create restore state entity task job. %v", err)
+	}
+	app.logger.InfoLog.Printf("Add restore state entity job for to %s schedule (cron with seconds!!!)", restoreStateEntitySchedule)
+
+	// Запуск планировщика в отдельной горутине
+	go func() {
+		app.scheduler.Start()
+	}()
 
 	restoreEntityTask := func() bool {
 		err := app.haApi.EnsureEntityState()

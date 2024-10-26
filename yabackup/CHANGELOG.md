@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.5
+- Restore state entity after HA restart (by cron task) [#15](https://github.com/maxifly/YaBackupAddon/issues/15)
+
 ## 2.0.4
 - Restore state entity after addon restart [#14](https://github.com/maxifly/YaBackupAddon/issues/14)
 
