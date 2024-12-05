@@ -16,6 +16,8 @@ map:
   - backup
 
 homeassistant_api: true
+hassio_api: true
+hassio_role: "admin"
 
 options:
   client_id: 0

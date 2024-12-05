@@ -92,6 +92,8 @@ func intersectFiles(
 		result = append(result,
 			types.BackupFileInfo{
 				GeneralInfo:    localFile.GeneralInfo,
+				BackupArchInfo: localFile.BackupArchInfo,
+				BackupSlug:     localFile.BackupSlug,
 				BackupName:     localFile.BackupName,
 				RemoteFileName: remoteFileName,
 				IsLocal:        true,
@@ -110,6 +112,10 @@ func intersectFiles(
 						Size:     remoteFile.Size,
 						Modified: remoteFile.Modified,
 					},
+					BackupArchInfo: &types.BackupArchInfo{HaVersion: "???",
+						Folders: make([]string, 0),
+						Addons:  make([]types.HaAddonInfo, 0),
+					},
 					BackupName:     remoteFile.Name,
 					RemoteFileName: remoteFile.Name,
 					IsLocal:        false,
@@ -127,7 +133,7 @@ func intersectFiles(
 
 // localFile.CreateDate.Format("02.01.2006 15:04:05 MST"),
 func generateRemoteFileName(localFile types.LocalBackupFileInfo) string {
-	return strings.ReplaceAll(strings.ReplaceAll(localFile.BackupName+"_"+localFile.Slug, " ", "-"), ":", "_")
+	return strings.ReplaceAll(strings.ReplaceAll(localFile.BackupName+"_"+localFile.BackupSlug, " ", "-"), ":", "_")
 }
 
 func getLocalBackupFiles(logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
@@ -160,10 +166,11 @@ func getLocalBackupFiles(logger *mylogger.Logger) (map[string]types.LocalBackupF
 		}
 
 		result[archInfo.Slug] = types.LocalBackupFileInfo{
-			GeneralInfo: convertBkFileInfoToGeneral(&info),
-			Slug:        archInfo.Slug,
-			BackupName:  archInfo.Name,
-			Path:        filePath,
+			GeneralInfo:    convertBkFileInfoToGeneral(&info),
+			BackupArchInfo: archInfo,
+			BackupSlug:     archInfo.Slug,
+			BackupName:     archInfo.Name,
+			Path:           filePath,
 		}
 	}
 	return result, nil
@@ -208,7 +215,7 @@ func extractArchInfo(logger *mylogger.Logger, tarfile string) (*types.BackupArch
 		if info.IsDir() || info.Name() != "backup.json" {
 			continue
 		} else {
-			var data types.BackupArchInfo
+			var data types.HaBackupInfo
 			plan, err := io.ReadAll(tarReader)
 
 			if err != nil {
@@ -224,7 +231,21 @@ func extractArchInfo(logger *mylogger.Logger, tarfile string) (*types.BackupArch
 			if data.Slug == "" || data.Name == "" {
 				return nil, fmt.Errorf("cannot parse backup info. Necessary field not found")
 			}
-			return &data, nil
+
+			result := types.BackupArchInfo{
+				Slug:       data.Slug,
+				Name:       data.Name,
+				BackupType: data.BackupType,
+				HaVersion:  data.HaVersion,
+				CoreInfo:   data.HaCoreInfo,
+				Folders:    data.Folders,
+				Addons:     data.Addons,
+			}
+
+			if &data.BackupCreated != nil {
+				result.BackupCreated = types.FileModified(data.BackupCreated.Time)
+			}
+			return &result, nil
 		}
 	}
 	return nil, fmt.Errorf("backup info not found")

@@ -1,0 +1,9 @@
+.card-title {
+  font-size: 1.25rem; /* Размер шрифта для заголовка */
+}
+.card-subtitle {
+  font-size: 1rem; /* Размер шрифта для подзаголовка */
+}
+.card-text {
+  font-size: 0.875rem; /* Размер шрифта для третьей строки */
+}

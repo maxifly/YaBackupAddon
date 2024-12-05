@@ -165,6 +165,13 @@ func (app *YbgApp) Start() {
 
 	await(restoreEntityTask, app.logger, restoreStateEntityInterval)
 
+	list, err := app.haApi.GetAddonList()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error read addons %v", err)
+	} else {
+		app.logger.InfoLog.Printf("Addons: %v", list)
+	}
+
 	err = app.restObj.Start()
 	log.Fatal(err)
 }
