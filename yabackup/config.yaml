@@ -38,6 +38,4 @@ schema:
   theme: "list(Light|Dark)"
   entity_id: "str?"
 
-startup: before
-
 ingress: true
