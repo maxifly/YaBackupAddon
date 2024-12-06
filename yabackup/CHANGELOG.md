@@ -1,4 +1,10 @@
 # Changelog
+## 2.01.0
+- Use bootstrap 5
+- Add modal window with archive content information
+- Remove deprecated "startup before" option  [#17](https://github.com/maxifly/YaBackupAddon/issues/17)
+
+
 ## 2.0.5
 - Restore state entity after HA restart (by cron task) [#15](https://github.com/maxifly/YaBackupAddon/issues/15)
 

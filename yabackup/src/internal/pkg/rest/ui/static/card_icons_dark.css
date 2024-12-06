@@ -1,0 +1,51 @@
+.card {
+    box-shadow: 0 1px 2px 0 rgba(200, 255, 255, 1);
+    transition: 0.3s;
+    width: 100%;
+    margin: 15px;
+    min-width: 230px;
+    max-width: 515px;
+    border-radius: 5px;
+}
+
+.icon {
+    height: auto;
+    width: 40px;
+}
+
+.icon.database {
+    content: url("database_dark.png");
+}
+
+.icon.cloud {
+    content: url("cloud_dark.png");
+}
+
+.icon.filesize {
+    content: url("elephant_dark.png");
+}
+
+.icon.backuptype {
+    content: url("package-down-dark.png");
+}
+
+.icon.ha {
+    content: url("home-assistant-dark.png");
+}
+
+.icon.clock {
+    content: url("clock-dark.png");
+}
+
+.icon.clock_out {
+    content: url("clock-out-dark.png");
+}
+
+
+.icon.database.hidden {
+    visibility: hidden
+}
+
+.icon.cloud.hidden {
+    visibility: hidden
+}

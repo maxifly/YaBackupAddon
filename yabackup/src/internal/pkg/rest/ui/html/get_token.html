@@ -1,26 +1,34 @@
 {{template "base" .}}
 {{define "scripts"}}{{end}}
 {{define "title"}}
-       <h2>Follow this
-        <a href="{{ .CheckCodeUrl }}" target="_blank">
-            link
-        </a>
-        and get check code</h2>
+<h2>Follow this
+    <a href="{{ .CheckCodeUrl }}" target="_blank">
+        link
+    </a>
+    and get check code</h2>
 {{end}}
 
 {{define "main"}}
 
 <form method="post">
-    <div class="form">
-      <div class="input-container ic1">
-        <input id="check_code" name="check_code" class="input" type="text" placeholder=" "/>
-        <div class="cut"></div>
-        <label for="check_code" class="placeholder">Check code</label>
-      </div>
-      <button type="submit" class="submit">submit</button>
+    <div class="container">
+        <div class="col-md-6">
+            <div class="form bg-secondary rounded-3">
+                <div class="mx-3 my-5">
+                    <label for="check_code" class="text-light">Check code:</label>
+                    <input id="check_code" name="check_code" class="form-control" type="text"
+                           placeholder="Check code"/>
+                </div>
+                <!--      <div class="input-container ic1">-->
+                <!--        <input id="check_code" name="check_code" class="input" type="text" placeholder=" "/>-->
+                <!--        <div class="cut"></div>-->
+                <!--        <label for="check_code" class="placeholder">Check code</label>-->
+                <!--      </div>-->
+                <button type="submit" class="btn btn-primary m-3">submit</button>
+            </div>
+        </div>
     </div>
 </form>
-
 
 
 {{end}}

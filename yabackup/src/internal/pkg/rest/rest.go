@@ -20,6 +20,7 @@ type BackupResponse struct {
 	IsDarkTheme   bool
 	AlertMessages []AlertMessage
 	BFiles        []types.BackupFileInfo
+	AddonIcons    map[string]string
 }
 type GetTokenResponse struct {
 	IsDarkTheme   bool
@@ -36,6 +37,7 @@ type Rest struct {
 	router       *mux.Router
 	port         string
 	theme        string
+	icons        map[string]string
 }
 
 func NewRest(port string,
@@ -54,7 +56,8 @@ func NewRest(port string,
 		haApi:        haApi,
 		theme:        theme,
 		router:       router,
-		logger:       logger}
+		logger:       logger,
+		icons:        make(map[string]string)}
 
 	router.HandleFunc("/", restObj.indexHandler).Methods("GET")
 	router.HandleFunc("/index", restObj.indexHandler).Methods("GET")
@@ -77,12 +80,136 @@ func (app *Rest) isUseDarkTheme() bool {
 	return app.theme == "Dark"
 }
 
+//func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
+//	app.logger.InfoLog.Println("indexHandler")
+//	files := []string{
+//		"./internal/pkg/rest/ui/html/index.html",
+//		"./internal/pkg/rest/ui/html/base_old.html",
+//	}
+//
+//	ts, err := template.ParseFiles(files...)
+//	if err != nil {
+//		app.logger.ErrorLog.Println(err.Error())
+//		http.Error(w, "Internal Server Error", 500)
+//		return
+//	}
+//
+//	alertMessages := make([]AlertMessage, 0)
+//	if app.yaDProcessor.IsTokenEmpty() {
+//		alertMessages = append(alertMessages, AlertMessage{Message: "Token does not exists"})
+//	} else if !app.yaDProcessor.IsTokenValid() {
+//		alertMessages = append(alertMessages, AlertMessage{Message: "Token is not valid or expired"})
+//	}
+//
+//	app.yaDProcessor.RefreshTokenIsNeed()
+//	filesInfo, err := app.bKProcessor.GetFilesInfo()
+//	if err != nil {
+//		alertMessages = append(alertMessages, AlertMessage{Message: err.Error()})
+//	}
+//
+//	// Calculate data for entity state
+//	localFileSize := types.FileSize(0)
+//	remoteFileSize := types.FileSize(0)
+//	localFiles := 0
+//	remoteFiles := 0
+//
+//	// Get file sizes for start state
+//	for _, file := range filesInfo {
+//		if file.IsRemote {
+//			remoteFileSize += file.GeneralInfo.Size
+//			remoteFiles++
+//		}
+//
+//		if file.IsLocal {
+//			localFileSize += file.GeneralInfo.Size
+//			localFiles++
+//		}
+//	}
+//
+//	// Get disk info
+//	diskInfo, err := app.yaDProcessor.GetDiskInfo()
+//	if err != nil {
+//		app.logger.ErrorLog.Printf("Error get disk info %s", err)
+//	}
+//
+//	// Update entity state
+//	entityState, err := app.haApi.GetEntityState()
+//	if err != nil {
+//		app.logger.ErrorLog.Printf("Error read state entity %s", err)
+//	}
+//
+//	if entityState == nil {
+//		entityState = &haoperate.EntityState{
+//			State:           haoperate.OK,
+//			LocalFiles:      localFiles,
+//			RemoteFiles:     remoteFiles,
+//			LocalSize:       localFileSize,
+//			RemoteSize:      remoteFileSize,
+//			RemoteFreeSpace: diskInfo.TotalSpace - diskInfo.UsedSpace,
+//		}
+//	} else {
+//		entityState.LocalFiles = localFiles
+//		entityState.RemoteFiles = remoteFiles
+//		entityState.LocalSize = localFileSize
+//		entityState.RemoteSize = remoteFileSize
+//		entityState.RemoteFreeSpace = diskInfo.TotalSpace - diskInfo.UsedSpace
+//	}
+//
+//	err = app.haApi.SetEntityState(
+//		*entityState)
+//	if err != nil {
+//		app.logger.ErrorLog.Printf("Error save entity state %s", err)
+//	}
+//
+//	data := BackupResponse{BFiles: filesInfo, AlertMessages: alertMessages, IsDarkTheme: app.isUseDarkTheme()}
+//
+//	err = ts.Execute(w, data)
+//	if err != nil {
+//		app.logger.ErrorLog.Println(err.Error())
+//		http.Error(w, "Internal Server Error", 500)
+//	}
+//}
+
+func (app *Rest) ensureLoadAddonIcons() {
+	if len(app.icons) == 0 {
+		app.logger.DebugLog.Printf("Load addon icons")
+		app.reloadAddonIcons()
+	} else {
+		app.logger.DebugLog.Printf("Addon icons already loaded")
+	}
+}
+
+func (app *Rest) reloadAddonIcons() {
+	newMap := make(map[string]string)
+
+	addons, err := app.haApi.GetAddonList()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Can not reload icons. %v", err)
+		return
+	}
+
+	for _, addonInfo := range addons.Addons {
+		if addonInfo.Icon {
+			icon, err := app.haApi.SaveAddonIcon(addonInfo.Slug)
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error when save icon for addon %v. %v", addonInfo.Slug, err)
+			} else {
+				newMap[addonInfo.Slug] = icon
+			}
+		}
+	}
+
+	app.icons = newMap
+
+}
 func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 	app.logger.InfoLog.Println("indexHandler")
 	files := []string{
 		"./internal/pkg/rest/ui/html/index.html",
 		"./internal/pkg/rest/ui/html/base.html",
 	}
+
+	app.ensureLoadAddonIcons()
 
 	ts, err := template.ParseFiles(files...)
 	if err != nil {
@@ -158,7 +285,11 @@ func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 		app.logger.ErrorLog.Printf("Error save entity state %s", err)
 	}
 
-	data := BackupResponse{BFiles: filesInfo, AlertMessages: alertMessages, IsDarkTheme: app.isUseDarkTheme()}
+	app.logger.DebugLog.Printf("%+v\n", filesInfo)
+	data := BackupResponse{BFiles: filesInfo,
+		AlertMessages: alertMessages,
+		IsDarkTheme:   app.isUseDarkTheme(),
+		AddonIcons:    app.icons}
 
 	err = ts.Execute(w, data)
 	if err != nil {

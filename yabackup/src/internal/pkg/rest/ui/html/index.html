@@ -1,31 +1,433 @@
 {{template "base" .}}
 {{define "title"}}<h1>Backups</h1>{{end}}
-{{define "scripts"}}{{end}}
+{{define "scripts"}}
+<!-- Модальное окно -->
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><span id="backupName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><img class="icon backuptype me-2"><span id="backupType"></span></p>
+                    </div>
+                    <div id="coreVersionSection" class="col-md-6" style="display: none;">
+                        <p>
+                            <img class="icon ha me-2">HA: v<span
+                                id="coreVersion"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><img class="icon filesize me-2"><span id="backupSize"></span> Mb</p>
+                    </div>
+                    <div id="backupCreatedSection" class="col-md-6" style="display: none;">
+                        <p>
+                            <img class="icon clock me-2">Created: <span
+                                id="backupCreated"></span></p>
+                    </div>
+                    <div id="backupUploadedSection" class="col-md-6" style="display: none;">
+                        <p>
+                            <img class="icon clock_out me-2">Uploaded: <span
+                                id="backupUploaded"></span></p>
+                    </div>
+                </div>
+
+                <div class="my-3">
+                    <h6>Present in:</h6>
+                </div>
+
+                <div class="container px-2">
+                    <div id="presentInLocal" class="row" style="display: none;">
+                        <div class="col-12 my-2">
+                            <div class="row">
+                                <div class="col-md-12 p-4 border border-secondary border-2 rounded-1">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                                <img class="icon database"> Local
+                                        </div>
+    <!--                                    <div class="col-md-8">-->
+    <!--                                            <button id="homeDeleteButton" class="btn btn-danger" onclick="confirmDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Удалить</button>-->
+    <!--                                            <button id="homeYesButton" class="btn btn-success" style="display:none;" onclick="deleteCard()">Да</button>-->
+    <!--                                            <button id="homeNoButton" class="btn btn-secondary" style="display:none;" onclick="cancelDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Нет-->
+    <!--                                            </button>-->
+    <!--                                    </div>-->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="presentInCloud" class="row" style="display: none;">
+                        <div class="col-12 my-2">
+                            <div class="row">
+                                <div class="col-md-12 p-4 border border-secondary border-2 rounded-1">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                                <img class="icon cloud"> Yandex Disk
+                                        </div>
+    <!--                                    <div class="col-md-8">-->
+    <!--                                            <button id="homeDeleteButton" class="btn btn-danger" onclick="confirmDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Удалить</button>-->
+    <!--                                            <button id="homeYesButton" class="btn btn-success" style="display:none;" onclick="deleteCard()">Да</button>-->
+    <!--                                            <button id="homeNoButton" class="btn btn-secondary" style="display:none;" onclick="cancelDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Нет-->
+    <!--                                            </button>-->
+    <!--                                    </div>-->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="my-3">
+                  <h6>Contains:</h6>
+                </div>
+
+                <div id="folders" class="row">
+                </div>
+
+                <div id="errorMessage" class="text-danger" style="display:none;">Ошибка удаления</div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{{end}}
 
 {{define "main"}}
 
 {{range .BFiles}}
-<div class="card">
-    <div class="container">
-        <h3>{{ .BackupName }}</h3>
-        <h4>{{ .GeneralInfo.Modified.Convert2String }}</h4>
-        <h5>{{ .GeneralInfo.Size.Convert2MbString }} MB</h5>
-        <div class="icons">
-            {{if .IsLocal}}
-            <img class="icon database">
-            {{else}}
-            <img class="icon database hidden">
-            {{end}}
-            {{if .IsRemote}}
-            <img class="icon cloud">
-            {{else}}
-            <img class="icon cloud hidden">
-            {{end}}
-        </div>
-    </div>
+
+<div class="card p-3 backup-card" data-bs-toggle="modal" data-bs-target="#exampleModal"
+
+     data-backupslug="{{ .BackupSlug }}"
+     data-backupname="{{ .BackupName }}"
+     data-backuptype=
+{{if eq .BackupArchInfo.BackupType "full"}}
+"Full backup"
+{{else}}
+"Partial backup"
+{{end}}
+
+data-backupsize = {{ .GeneralInfo.Size.Convert2MbString }}
+
+data-createdtime = {{ .BackupArchInfo.BackupCreated.Convert2String }}
+data-isShowCreatedTime =
+{{if .BackupArchInfo.BackupCreated.IsZero }}
+0
+{{else}}
+1
+{{end}}
+data-uploadedTime = {{ .GeneralInfo.Modified.Convert2String }}
+data-isShowUploadedTime =
+{{if or (.GeneralInfo.Modified.IsZero) (not .IsRemote) }}
+0
+{{else}}
+1
+{{end}}
+
+data-addons = '[
+{{range .BackupArchInfo.Addons}}
+{"name":"{{.Name}}", "version": "{{.Version}}", "slug": "{{.Slug}}", "isHidden":0 },
+{{end}}
+{"name":"test", "version":"test", "slug":"test", "isHidden":1}
+]'
+
+data-folders = '[
+{{range .BackupArchInfo.Folders}}
+{"name":"{{.}}", "isHidden":0},
+{{end}}
+{"name":"test",  "isHidden":1}
+]'
+
+data-core =
+{{if or (not .BackupArchInfo.CoreInfo) (eq .BackupArchInfo.CoreInfo.Version "") (eq .BackupArchInfo.CoreInfo.Version "???") }}
+'{"version":"???", "isHidden":1}'
+{{else}}
+'{"version":"{{.BackupArchInfo.CoreInfo.Version}}", "isHidden":0}'
+{{end}}
+
+data-isRemote =
+{{if .IsRemote }}
+1
+{{else}}
+0
+{{end}}
+
+data-isLocal =
+{{if .IsLocal }}
+1
+{{else}}
+0
+{{end}}
+>
+
+
+<h4 class="card-title pb-2">{{ .BackupName }}</h4>
+<h5 class="card-subtitle">{{ .GeneralInfo.Modified.Convert2String }}</h5>
+<p class="card-text">{{ .GeneralInfo.Size.Convert2MbString }} MB</p>
+<div class="d-flex justify-content-start">
+    {{if .IsLocal}}
+    <img class="icon database">
+    {{else}}
+    <img class="icon database hidden">
+    {{end}}
+    {{if .IsRemote}}
+    <img class="icon cloud">
+    {{else}}
+    <img class="icon cloud hidden">
+    {{end}}
 </div>
-{{end}}
+</div>
 
 {{end}}
 
-{{define "bottom_scripts"}}{{end}}
+{{end}}
+
+{{define "bottom_scripts"}}
+<script>
+
+    const addonIcons = new Map([
+    {{ range $key, $value := .AddonIcons }}
+      ['{{ $key }}', '{{ $value }}'],
+    {{ end }}
+    ]);
+
+    // Получаем данные константные для всей страницы
+    const isDarkMode = {{.IsDarkTheme}}
+    const haFolder = "homeassistant"
+
+    let currentBackupSlug;
+
+    document.querySelectorAll('.backup-card').forEach(card => {
+        card.addEventListener('click', function () {
+
+
+
+            // Получаем данные из атрибутов карточки
+            const backupSlug = this.getAttribute('data-backupslug');
+            const backupName = this.getAttribute('data-backupname');
+            const backupType = this.getAttribute('data-backuptype');
+            const backupSize = this.getAttribute('data-backupsize');
+            const createdTime = this.getAttribute('data-createdtime');
+            const isShowCreatedTime = this.getAttribute('data-isShowCreatedTime');
+            const uploadedTime = this.getAttribute('data-uploadedTime');
+            const isShowUploadedTime = this.getAttribute('data-isShowUploadedTime');
+
+            const isLocal = this.getAttribute('data-isLocal');
+            const isRemote = this.getAttribute('data-isRemote');
+
+            const addonsData = JSON.parse(this.getAttribute('data-addons'));
+            const foldersData = JSON.parse(this.getAttribute('data-folders'));
+            const coreData = JSON.parse(this.getAttribute('data-core'));
+
+            document.getElementById('backupName').innerText = backupName;
+            document.getElementById('backupType').innerText = backupType;
+            document.getElementById('backupSize').innerText = backupSize;
+            document.getElementById('backupCreated').innerText = createdTime;
+            document.getElementById('backupUploaded').innerText = uploadedTime;
+            document.getElementById('coreVersion').innerText = coreData.version;
+            document.getElementById('errorMessage').style.display = 'none';
+
+
+            if (coreData.isHidden == 0) {
+                document.getElementById('coreVersionSection').style.display = 'block';
+            } else {
+                document.getElementById('coreVersionSection').style.display = 'none';
+            }
+
+           if (isShowCreatedTime == 1) {
+                document.getElementById('backupCreatedSection').style.display = 'block';
+            } else {
+                document.getElementById('backupCreatedSection').style.display = 'none';
+            }
+
+            if (isShowUploadedTime == 1) {
+                document.getElementById('backupUploadedSection').style.display = 'block';
+            } else {
+                document.getElementById('backupUploadedSection').style.display = 'none';
+            }
+
+            if (isLocal == 1) {
+                document.getElementById('presentInLocal').style.display = 'block';
+            } else {
+                document.getElementById('presentInLocal').style.display = 'none';
+            }
+            if (isRemote == 1) {
+                document.getElementById('presentInCloud').style.display = 'block';
+            } else {
+                document.getElementById('presentInCloud').style.display = 'none';
+            }
+
+
+            const foldersContainer = document.getElementById('folders');
+            foldersContainer.innerHTML = ''; // Очищаем предыдущие данные
+
+                if (coreData.isHidden == 0) {
+                    const coreCol = document.createElement('div');
+                    coreCol.className = 'col-md-6 addon';
+                    coreCol.innerHTML = `
+                            <div class="row">
+                              <div class="col-md-4"> <img class="icon me-2 float-end" src=${getFolderIcon(haFolder)}> </div>
+                              <div class="col-md-8">
+                                <div class="row">
+                                   <div class="col-md-12">
+                                        ${getFolderName(haFolder)}
+                                   </div>
+                                   <div class="col-md-12">
+                                        v${coreData.version}
+                                   </div>
+                                </div>
+                              </div>
+                            </div>
+                `;
+                    foldersContainer.appendChild(coreCol);
+                }
+
+
+            foldersData.forEach(folder => {
+                if (folder.isHidden == 0) {
+                    const folderCol = document.createElement('div');
+                    folderCol.className = 'col-md-6 addon';
+                    folderCol.innerHTML = `
+                            <div class="row">
+                              <div class="col-md-4"> <img class="icon me-2 float-end" src=${getFolderIcon(folder.name)}> </div>
+                              <div class="col-md-8">
+                                <div class="row">
+                                   <div class="col-md-12">
+                                        ${getFolderName(folder.name)}
+                                   </div>
+                                   <div class="col-md-12">
+                                        &nbsp;
+                                   </div>
+                                </div>
+                              </div>
+                            </div>
+                `;
+                    foldersContainer.appendChild(folderCol);
+                }
+            });
+
+            addonsData.forEach(addon => {
+                if (addon.isHidden == 0) {
+                    const residentCol = document.createElement('div');
+                    residentCol.className = 'col-md-6 addon';
+                    residentCol.innerHTML = `
+                            <div class="row">
+                              <div class="col-md-4"> <img class="icon me-2 float-end" src=${getAppIcon(addon.slug)}> </div>
+                              <div class="col-md-8">
+                                <div class="row">
+                                   <div class="col-md-12">
+                                        ${addon.name}
+                                   </div>
+                                   <div class="col-md-12">
+                                        v${addon.version}
+                                   </div>
+                                </div>
+                              </div>
+                            </div>
+                `;
+                    foldersContainer.appendChild(residentCol);
+                }
+            });
+
+            // Сброс состояния модального окна
+            document.getElementById('deleteButton').disabled = false;
+            document.getElementById('yesButton').style.display = 'none';
+            document.getElementById('noButton').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+
+            currentBackupSlug = backupSlug;
+        })
+    });
+
+    function confirmDelete(deleteButton, yesButton, noButton) {
+        document.getElementById(deleteButton).disabled = true;
+        document.getElementById(yesButton).style.display = 'inline-block';
+        document.getElementById(noButton).style.display = 'inline-block';
+    }
+
+    function cancelDelete(deleteButton, yesButton, noButton) {
+        document.getElementById(deleteButton).disabled = false;
+        document.getElementById(yesButton).style.display = 'none';
+        document.getElementById(noButton).style.display = 'none';
+    }
+
+    function deleteCard() {
+        // Выполняем REST-запрос (имитация)
+        fetch('/delete/card', {method: 'DELETE'})
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Ошибка удаления');
+                }
+                // Успешное удаление
+                const modal = bootstrap.Modal.getInstance(document.getElementById('exampleModal'));
+                modal.hide();
+                alert('Квартира удалена');
+            })
+            .catch(error => {
+                document.getElementById('errorMessage').style.display = 'block';
+                document.getElementById('deleteButton').disabled = false;
+                document.getElementById('yesButton').style.display = 'none';
+                document.getElementById('noButton').style.display = 'none';
+            });
+    }
+
+    function getFolderName(slug) {
+        if (slug == "share") {
+            return "Share Folder";
+        } else if (slug == "ssl") {
+            return "SSL Folder";
+        } else if (slug == "addons/local") {
+            return "Local Add-on Folder";
+        } else if (slug == "media") {
+            return "Media Folder";
+        } else if (slug == "homeassistant") {
+            return "HA config";
+        }
+        return slug;
+    }
+
+    function getFolderIcon(slug) {
+        var icon = "folder-outline"
+        if (slug == "share") {
+            icon = "folder-account";
+        } else if (slug == "ssl") {
+            icon = "folder-key";
+        } else if (slug == "addons/local") {
+            icon = "folder-pound";
+        } else if (slug == "media") {
+            icon = "folder-music";
+        } else if (slug == "homeassistant") {
+            icon = "folder-home";
+        }
+
+        if (isDarkMode) {
+            icon = icon + "-dark"
+        }
+
+        icon = "static/" + icon + ".png"
+        return icon;
+    }
+
+    function getAppIcon(slug) {
+        var icon = "default-app"
+        if (isDarkMode) {
+            icon = icon + "-dark"
+        }
+        icon = icon + ".png"
+
+        if (addonIcons.has(slug)) {
+            icon = addonIcons.get(slug)
+        }
+
+        icon = "static/appicons/" + icon
+        return icon;
+    }
+</script>
+{{end}}

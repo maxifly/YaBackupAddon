@@ -1,6 +1,6 @@
 name: "Yandex backup"
 description: "Copy HA backup to YandexDisk"
-version: "2.0.5"
+version: "2.01.0"
 slug: "yabackup"
 url: "https://github.com/maxifly/YaBackupAddon/tree/main/yabackup"
 image: "ghcr.io/maxifly/yabackupaddon/yabackup-{arch}"
@@ -16,6 +16,8 @@ map:
   - backup
 
 homeassistant_api: true
+hassio_api: true
+hassio_role: "admin"
 
 options:
   client_id: 0
@@ -35,7 +37,5 @@ schema:
   log_level: "list(DEBUG|INFO|WARNING|ERROR)"
   theme: "list(Light|Dark)"
   entity_id: "str?"
-
-startup: before
 
 ingress: true

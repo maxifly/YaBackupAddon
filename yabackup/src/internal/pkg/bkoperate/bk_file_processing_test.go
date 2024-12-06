@@ -17,7 +17,7 @@ func Test_extractArchInfo(t *testing.T) {
 		InfoLog:  errorLog,
 		DebugLog: errorLog}
 
-	info, err := extractArchInfo(logger, filepath.Join("testresources", "correct_file.tar"))
+	info, err := extractArchInfo(logger, filepath.Join("../../../testresources", "correct_file.tar"))
 
 	assert.Nil(t, err, "Error must be nil")
 	assert.Equal(t, "5508d5ad", info.Slug, "Slug not equal")

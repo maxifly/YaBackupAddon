@@ -15,10 +15,12 @@ import (
 )
 
 const (
-	BaseURL             string = "http://supervisor/core/api"
+	CoreBaseURL         string = "http://supervisor/core/api"
+	AddonsBaseURL       string = "http://supervisor/addons"
 	EntityIdPrefix      string = "sensor."
 	DefaultEntityId     string = "yandex_backup_state"
 	localEntityCopyPath string = "/data/entity-copy.json"
+	addonIconPath       string = "/app/yabackup/internal/pkg/rest/ui/static/appicons"
 )
 
 type HaApiClient struct {
@@ -78,6 +80,21 @@ type EntityState struct {
 	RemoteSize       types.FileSize
 	RemoteFreeSpace  types.FileSize
 	LastUploadedTime CustomTime
+}
+
+type Addon struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	Icon bool   `json:"icon"`
+}
+
+type Addons struct {
+	Addons []Addon `json:"addons"`
+}
+
+type getAddonsResult struct {
+	Result string  `json:"result"`
+	Data   *Addons `json:"data"`
 }
 
 // CustomTime - пользовательский тип, оборачивающий time.Time
@@ -149,7 +166,7 @@ func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 
 func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
 	haApi.logger.DebugLog.Println("Get entity request")
-	url := fmt.Sprintf("%s/states/%s", BaseURL, haApi.entity_id)
+	url := fmt.Sprintf("%s/states/%s", CoreBaseURL, haApi.entity_id)
 
 	// Создаем новый HTTP-запрос
 	req, err := http.NewRequest("GET", url, nil)
@@ -237,10 +254,108 @@ func (haApi *HaApiClient) EnsureEntityState() error {
 
 }
 
+func (haApi *HaApiClient) GetAddonList() (*Addons, error) {
+	haApi.logger.DebugLog.Println("Get addons request")
+	url := fmt.Sprintf("%s", AddonsBaseURL)
+
+	// Создаем новый HTTP-запрос
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		resultError := fmt.Errorf("error when create request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	// Устанавливаем заголовок авторизации
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
+	req.Header.Set("Accept", "application/json") // Ожидание ответа в формате JSON
+
+	// Выполняем запрос
+	resp, err := haApi.httpClient.Do(req)
+	if err != nil {
+		resultError := fmt.Errorf("error when execute request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	defer resp.Body.Close()
+
+	// Проверяем статус код
+	if resp.StatusCode != http.StatusOK {
+		resultError := fmt.Errorf("failed to fetch data: %s", resp.Status)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	// Читаем тело ответа
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		resultError := fmt.Errorf("error when read body: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+
+	// Декодируем JSON-ответ
+	var addonsList getAddonsResult
+	if err := json.Unmarshal(body, &addonsList); err != nil {
+		resultError := fmt.Errorf("error when parse body: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return nil, resultError
+	}
+	haApi.logger.DebugLog.Printf("Get addons result %v", addonsList)
+	return addonsList.Data, nil
+}
+
+func (haApi *HaApiClient) SaveAddonIcon(slug string) (string, error) {
+	haApi.logger.DebugLog.Println("Save addon icon")
+	url := fmt.Sprintf("%s/%s/icon", AddonsBaseURL, slug)
+	outputFileName := "f" + slug + ".ico"
+	outputFile := addonIconPath + "/" + outputFileName
+
+	// Создаем новый HTTP-запрос
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		resultError := fmt.Errorf("error when create request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return "", resultError
+	}
+
+	// Устанавливаем заголовок авторизации
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
+
+	// Выполняем запрос
+	resp, err := haApi.httpClient.Do(req)
+	if err != nil {
+		resultError := fmt.Errorf("error when execute request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return "", resultError
+	}
+
+	defer resp.Body.Close()
+
+	// Открываем (или создаем) файл для записи
+	file, err := os.Create(outputFile)
+	if err != nil {
+		fmt.Println("Ошибка при создании файла:", err)
+		return "", err
+	}
+	defer file.Close()
+
+	// Записываем данные из ответа напрямую в файл
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		fmt.Println("Ошибка при записи в файл:", err)
+		return "", err
+	}
+
+	return outputFileName, nil
+
+}
+
 func (haApi *HaApiClient) innerSetEntityState(entityState EntityState, saveLocalCopy bool) error {
 	haApi.logger.DebugLog.Println("Set entity")
 
-	url := fmt.Sprintf("%s/states/%s", BaseURL, haApi.entity_id)
+	url := fmt.Sprintf("%s/states/%s", CoreBaseURL, haApi.entity_id)
 
 	data := setEntityStateRequest{
 		State: entityState.State,
