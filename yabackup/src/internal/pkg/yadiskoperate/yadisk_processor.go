@@ -127,14 +127,16 @@ func (app *YaDProcessor) GetRemoteFiles() ([]types.RemoteFileInfo, error) {
 			continue
 		}
 
-		modifyedTime, err := convertDateString(item.Modified)
+		modifiedTime, err := convertDateString(item.Modified)
 		if err != nil {
 			app.logger.ErrorLog.Printf("Can not parse data %s %v", item.Modified, err)
-			modifyedTime = minTime
+			modifiedTime = minTime
 		}
+
 		result = append(result, types.RemoteFileInfo{Name: item.Name,
 			Size:     types.FileSize(item.Size),
-			Modified: types.FileModified(modifyedTime)})
+			Created:  types.FileModified(modifiedTime),
+			Modified: types.FileModified(modifiedTime)})
 
 	}
 
@@ -179,15 +181,20 @@ func (app *YaDProcessor) UploadFile(source string, destinationFileName string) e
 	return nil
 }
 
-func (app *YaDProcessor) DeleteFile(remoteFileName string, md5 string) error {
+func (app *YaDProcessor) DeleteFile(remoteFileName string, md5 string, permanently bool) error {
 	remoteName := app.remotePath + "/" + remoteFileName
 	app.logger.DebugLog.Printf("Try delete %s", remoteName)
 
-	_, err := (*app.yaDisk).DeleteResource(remoteName, nil, false, md5, false)
+	_, err := (*app.yaDisk).DeleteResource(remoteName, nil, false, md5, permanently)
 	if err != nil {
 		return err
 	}
-	app.logger.InfoLog.Printf("Success delete file %s", remoteName)
+	if permanently {
+		app.logger.InfoLog.Printf("Success permanently delete file %s", remoteName)
+	} else {
+		app.logger.InfoLog.Printf("Success delete file %s", remoteName)
+	}
+
 	return nil
 }
 

@@ -123,9 +123,9 @@ data-isShowCreatedTime =
 {{else}}
 1
 {{end}}
-data-uploadedTime = {{ .GeneralInfo.Modified.Convert2String }}
+data-uploadedTime = {{ .Downloaded.Convert2String }}
 data-isShowUploadedTime =
-{{if or (.GeneralInfo.Modified.IsZero) (not .IsRemote) }}
+{{if or (.Downloaded.IsZero) (not .IsRemote) }}
 0
 {{else}}
 1
@@ -169,7 +169,7 @@ data-isLocal =
 
 
 <h4 class="card-title pb-2">{{ .BackupName }}</h4>
-<h5 class="card-subtitle">{{ .GeneralInfo.Modified.Convert2String }}</h5>
+<h5 class="card-subtitle">{{ .GeneralInfo.Created.Convert2String }}</h5>
 <p class="card-text">{{ .GeneralInfo.Size.Convert2MbString }} MB</p>
 <div class="d-flex justify-content-start">
     {{if .IsLocal}}

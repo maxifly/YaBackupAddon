@@ -9,6 +9,8 @@ import (
 const MiB = float64(1 << 20)
 const PUT = "PUT"
 
+var currentLocation *time.Location = time.Now().Location()
+
 type FileSize int64
 type FileModified time.Time
 
@@ -17,7 +19,7 @@ func (fs FileSize) Convert2MbString() string {
 }
 
 func (fm FileModified) Convert2String() string {
-	return time.Time(fm).Format("02.01.2006 15:04:05 MST")
+	return time.Time(fm).In(currentLocation).Format("02.01.2006 15:04:05 MST")
 }
 
 func (fm FileModified) IsZero() bool {

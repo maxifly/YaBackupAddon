@@ -1,4 +1,8 @@
 # Changelog
+## 2.01.1
+- Old backup deleted permanently. Trashcan not used.  [#21](https://github.com/maxifly/YaBackupAddon/issues/21)
+- Fix uploaded time.  [#18](https://github.com/maxifly/YaBackupAddon/issues/18)
+
 ## 2.01.0
 - Use bootstrap 5
 - Add modal window with archive content information

@@ -1,6 +1,6 @@
 name: "Yandex backup"
 description: "Copy HA backup to YandexDisk"
-version: "2.01.0"
+version: "2.01.1"
 slug: "yabackup"
 url: "https://github.com/maxifly/YaBackupAddon/tree/main/yabackup"
 image: "ghcr.io/maxifly/yabackupaddon/yabackup-{arch}"

@@ -18,6 +18,7 @@ type DiskInfo struct {
 type GeneralFileInfo struct {
 	Name     string
 	Size     FileSize
+	Created  FileModified
 	Modified FileModified
 }
 
@@ -29,6 +30,7 @@ type BackupFileInfo struct {
 	BackupSlug     string
 	BackupName     string
 	RemoteFileName string
+	Downloaded     FileModified
 	IsLocal        bool
 	IsRemote       bool
 }

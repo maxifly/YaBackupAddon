@@ -70,16 +70,17 @@ func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo
 }
 
 type stringSet map[string]bool
+type remoteFilesMap map[string]types.RemoteFileInfo
 
 func intersectFiles(
 	localFiles map[string]types.LocalBackupFileInfo,
 	remoteFiles []types.RemoteFileInfo) ([]types.BackupFileInfo, error) {
 
-	remoteFileNames := make(stringSet)
+	remoteFileNames := make(remoteFilesMap)
 	processedRemoteFile := make(stringSet)
 
 	for _, remoteFile := range remoteFiles {
-		remoteFileNames[remoteFile.Name] = true
+		remoteFileNames[remoteFile.Name] = remoteFile
 	}
 
 	result := make([]types.BackupFileInfo, 0, len(localFiles))
@@ -87,18 +88,24 @@ func intersectFiles(
 	// Обработаем локальные файлы
 	for _, localFile := range localFiles {
 		remoteFileName := generateRemoteFileName(localFile)
-		_, isRemote := remoteFileNames[remoteFileName]
+		remoteFileInfo, isRemote := remoteFileNames[remoteFileName]
+
+		backupFileInfo := types.BackupFileInfo{
+			GeneralInfo:    localFile.GeneralInfo,
+			BackupArchInfo: localFile.BackupArchInfo,
+			BackupSlug:     localFile.BackupSlug,
+			BackupName:     localFile.BackupName,
+			RemoteFileName: remoteFileName,
+			IsLocal:        true,
+			IsRemote:       isRemote,
+		}
+
+		if isRemote {
+			backupFileInfo.Downloaded = remoteFileInfo.Created
+		}
 
 		result = append(result,
-			types.BackupFileInfo{
-				GeneralInfo:    localFile.GeneralInfo,
-				BackupArchInfo: localFile.BackupArchInfo,
-				BackupSlug:     localFile.BackupSlug,
-				BackupName:     localFile.BackupName,
-				RemoteFileName: remoteFileName,
-				IsLocal:        true,
-				IsRemote:       isRemote,
-			})
+			backupFileInfo)
 
 		processedRemoteFile[remoteFileName] = true
 	}
@@ -111,6 +118,7 @@ func intersectFiles(
 						Name:     remoteFile.Name,
 						Size:     remoteFile.Size,
 						Modified: remoteFile.Modified,
+						Created:  remoteFile.Created,
 					},
 					BackupArchInfo: &types.BackupArchInfo{HaVersion: "???",
 						Folders: make([]string, 0),
@@ -118,6 +126,7 @@ func intersectFiles(
 					},
 					BackupName:     remoteFile.Name,
 					RemoteFileName: remoteFile.Name,
+					Downloaded:     remoteFile.Created,
 					IsLocal:        false,
 					IsRemote:       true,
 				})
@@ -126,12 +135,18 @@ func intersectFiles(
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return time.Time(result[i].GeneralInfo.Modified).After(time.Time(result[j].GeneralInfo.Modified))
+		return time.Time(getSortedTime(&result[i])).After(time.Time(getSortedTime(&result[j])))
 	})
 	return result, nil
 }
 
-// localFile.CreateDate.Format("02.01.2006 15:04:05 MST"),
+func getSortedTime(backupFileInfo *types.BackupFileInfo) types.FileModified {
+	if backupFileInfo.IsRemote {
+		return backupFileInfo.Downloaded
+	}
+	return backupFileInfo.GeneralInfo.Modified
+}
+
 func generateRemoteFileName(localFile types.LocalBackupFileInfo) string {
 	return strings.ReplaceAll(strings.ReplaceAll(localFile.BackupName+"_"+localFile.BackupSlug, " ", "-"), ":", "_")
 }
@@ -180,6 +195,7 @@ func getLocalBackupFiles(logger *mylogger.Logger) (map[string]types.LocalBackupF
 func convertBkFileInfoToGeneral(bkFileInfo *fs.FileInfo) types.GeneralFileInfo {
 	return types.GeneralFileInfo{Name: (*bkFileInfo).Name(),
 		Size:     types.FileSize((*bkFileInfo).Size()),
+		Created:  types.FileModified((*bkFileInfo).ModTime()),
 		Modified: types.FileModified((*bkFileInfo).ModTime()),
 	}
 }

@@ -88,7 +88,7 @@ func (bkp *BkProcessor) DeleteFiles(files []types.ForDeleteFileInfo) (ProcessedF
 	//TODO Add real Md5
 	for _, file := range files {
 		bkp.logger.DebugLog.Printf("Try delete %s", file.RemoteFileName)
-		err := bkp.YaDProcessor.DeleteFile(file.RemoteFileName, file.MD5)
+		err := bkp.YaDProcessor.DeleteFile(file.RemoteFileName, file.MD5, true)
 		if err != nil {
 			bkp.logger.ErrorLog.Printf("Error when delete file %s. Err: %s", file.RemoteFileName, err)
 			isError = true
