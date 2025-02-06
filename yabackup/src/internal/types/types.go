@@ -52,6 +52,7 @@ type HaBackupInfo struct {
 	BackupCreated CustomTimeRFC3339Nano `json:"date"`
 	Folders       []string              `json:"folders"`
 	Addons        []HaAddonInfo         `json:"addons"`
+	Crypto        string                `json:"crypto"`
 }
 type HaAddonInfo struct {
 	Slug    string `json:"slug"`
