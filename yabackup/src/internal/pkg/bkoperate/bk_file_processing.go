@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
@@ -151,8 +152,127 @@ func generateRemoteFileName(localFile types.LocalBackupFileInfo) string {
 	return strings.ReplaceAll(strings.ReplaceAll(localFile.BackupName+"_"+localFile.BackupSlug, " ", "-"), ":", "_")
 }
 
-func getLocalBackupFiles(logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
+func getLocalBackupFiles(haApi *haoperate.HaApiClient, logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
+	// TODO Переделать на использование результата РЕСТ запроса
+	fileNames, err := getAllFileNames(logger, BACKUP_PATH)
+	if err != nil {
+		return nil, err
+	}
 
+	list, err := haApi.GetBackupSlugsList()
+	if err != nil {
+		return nil, err
+	}
+	//result := make([]haoperate.HaBackupInfo, len(list.Backups))
+
+	result := make(map[string]types.LocalBackupFileInfo)
+
+	for _, element := range list.Backups {
+		information, err := haApi.GetBackupInformation(element.Slug)
+		if err != nil {
+			logger.ErrorLog.Printf("Error when get information about backup %s. %s", element, err)
+			continue
+		}
+
+		isLocal := information.Location == ""
+
+		fileName := ""
+		filePath := ""
+
+		if isLocal {
+			fileName, err = findFile(&fileNames, information.Slug)
+			if err != nil {
+				return nil, err
+			}
+			filePath = filepath.Join(BACKUP_PATH, fileName)
+		}
+
+		result[information.Slug] = types.LocalBackupFileInfo{
+			GeneralInfo:    convertHaBackupInfoToGeneral(information, fileName),
+			BackupArchInfo: convertHaBackupInfoToBackupArchInfo(information),
+			BackupSlug:     information.Slug,
+			BackupName:     information.Name,
+			IsNetwork:      !isLocal || len(information.Locations) > 0,
+			IsLocal:        isLocal,
+			Path:           filePath,
+		}
+
+	}
+
+	return result, nil
+
+}
+
+func findFile(files *[]string, slug string) (string, error) {
+	for _, str := range *files {
+		if strings.Contains(str, slug) {
+			return str, nil
+		}
+	}
+	return "", fmt.Errorf("file not found")
+}
+
+func convertHaBackupInfoToGeneral(haFileInfo *haoperate.HaBackupInfo, fileName string) types.GeneralFileInfo {
+	result := types.GeneralFileInfo{Name: fileName,
+		Size:     types.FileSize((*haFileInfo).Size),
+		Created:  types.FileModified((*haFileInfo).BackupCreated.Time),
+		Modified: types.FileModified((*haFileInfo).BackupCreated.Time),
+	}
+
+	if fileName == "" {
+		result.Name = (*haFileInfo).Name
+	}
+
+	return result
+}
+
+func convertHaBackupInfoToBackupArchInfo(haFileInfo *haoperate.HaBackupInfo) *types.BackupArchInfo {
+	haCoreInfo := types.HaCoreInfo{
+		Version: haFileInfo.HaCoreVersion,
+	}
+
+	return &types.BackupArchInfo{
+		Slug:          haFileInfo.Slug,
+		Name:          haFileInfo.Name,
+		BackupType:    haFileInfo.BackupType,
+		HaVersion:     haFileInfo.HaSupervisorVersion,
+		CoreInfo:      haCoreInfo,
+		BackupCreated: types.FileModified((*haFileInfo).BackupCreated.Time),
+		Folders:       haFileInfo.Folders,
+		Addons:        *convertAddonList(&haFileInfo.Addons),
+	}
+}
+
+func convertAddonList(haAddons *[]haoperate.HaAddonInfo) *[]types.HaAddonInfo {
+	result := make([]types.HaAddonInfo, len(*haAddons))
+
+	for i, element := range *haAddons {
+		result[i] = types.HaAddonInfo{
+			Slug:    element.Slug,
+			Name:    element.Name,
+			Version: element.Version,
+		}
+	}
+
+	return &result
+}
+
+func getAllFileNames(logger *mylogger.Logger, path string) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		logger.ErrorLog.Printf("Unable to read backup %s. %v", BACKUP_PATH, err)
+		return nil, fmt.Errorf("error when read local backups")
+	}
+
+	result := make([]string, len(entries))
+	for i, entry := range entries {
+		result[i] = entry.Name()
+	}
+	return result, nil
+}
+
+func getLocalBackupFilesByPath(logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
+	// TODO Удалить
 	entries, err := os.ReadDir(BACKUP_PATH)
 	if err != nil {
 		logger.ErrorLog.Printf("Unable to read backup %s. %v", BACKUP_PATH, err)

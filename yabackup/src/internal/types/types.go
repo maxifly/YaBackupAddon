@@ -33,6 +33,7 @@ type BackupFileInfo struct {
 	Downloaded     FileModified
 	IsLocal        bool
 	IsRemote       bool
+	IsNetwork      bool
 }
 
 type LocalBackupFileInfo struct {
@@ -41,6 +42,8 @@ type LocalBackupFileInfo struct {
 	BackupSlug     string
 	BackupName     string
 	Path           string
+	IsLocal        bool
+	IsNetwork      bool
 }
 
 type HaBackupInfo struct {

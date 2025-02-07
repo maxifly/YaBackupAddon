@@ -173,7 +173,8 @@ type HaBackupInfo struct {
 	Addons              []HaAddonInfo               `json:"addons"`
 	Protected           bool                        `json:"protected"`
 	Size                int64                       `json:"size_bytes"`
-	Location            bool                        `json:"location"`
+	Location            string                      `json:"location"`
+	Locations           []string                    `json:"locations"`
 }
 type HaAddonInfo struct {
 	Slug    string `json:"slug"`
