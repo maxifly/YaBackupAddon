@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"time"
+	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/pkg/yadiskoperate"
 	"ybg/internal/types"
@@ -13,13 +14,16 @@ const BACKUP_PATH = "/backup"
 
 type BkProcessor struct {
 	YaDProcessor               *yadiskoperate.YaDProcessor
+	haApi                      *haoperate.HaApiClient
 	remoteMaximumFilesQuantity int
 	logger                     *mylogger.Logger
 }
 
-func NewBkProcessor(yaDP *yadiskoperate.YaDProcessor, remoteMaximumFilesQuantity int, logger *mylogger.Logger) *BkProcessor {
+func NewBkProcessor(yaDP *yadiskoperate.YaDProcessor, haApi *haoperate.HaApiClient,
+	remoteMaximumFilesQuantity int, logger *mylogger.Logger) *BkProcessor {
 	return &BkProcessor{
 		YaDProcessor:               yaDP,
+		haApi:                      haApi,
 		remoteMaximumFilesQuantity: remoteMaximumFilesQuantity,
 		logger:                     logger,
 	}
@@ -32,7 +36,7 @@ func (bkp *BkProcessor) GetFilesInfo() ([]types.BackupFileInfo, error) {
 	if err != nil {
 		return make([]types.BackupFileInfo, 0), err
 	}
-	localFiles, err := getLocalBackupFiles(bkp.logger)
+	localFiles, err := getLocalBackupFiles(bkp.haApi, bkp.logger)
 	if err != nil {
 		return make([]types.BackupFileInfo, 0), err
 	}

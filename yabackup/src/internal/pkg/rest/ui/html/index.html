@@ -177,6 +177,11 @@ data-isLocal =
     {{else}}
     <img class="icon database hidden">
     {{end}}
+    {{if .IsNetwork}}
+    <img class="icon nas">
+    {{else}}
+    <img class="icon nas hidden">
+    {{end}}
     {{if .IsRemote}}
     <img class="icon cloud">
     {{else}}

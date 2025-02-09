@@ -21,6 +21,10 @@
     content: url("cloud.png");
 }
 
+.icon.nas {
+    content: url("nas.png");
+}
+
 .icon.filesize {
     content: url("elephant.png");
 }
@@ -46,5 +50,9 @@
 }
 
 .icon.cloud.hidden {
+    visibility: hidden
+}
+
+.icon.nas.hidden {
     visibility: hidden
 }

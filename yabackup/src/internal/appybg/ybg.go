@@ -76,18 +76,18 @@ func NewYbg(port string) *YbgApp {
 		InfoLog:  infoLog,
 		DebugLog: debugLog}
 
-	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
-	bkP := bkoperate.NewBkProcessor(yaDP, options.RemoteMaximumFilesQuantity, &logger)
-
-	yaDP.EnsureTokenInfo()
-	yaDP.RefreshTokenIsNeed()
-	yaDP.EnsureYandexDisk()
 	haApi, err := createHaApiClient(&logger, options.EntityId)
-
 	if err != nil {
 		logger.ErrorLog.Printf("Error create HaApiClient %v", err)
 		//panic(fmt.Sprintf("error create HaApiClient %v", err))
 	}
+
+	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
+	bkP := bkoperate.NewBkProcessor(yaDP, haApi, options.RemoteMaximumFilesQuantity, &logger)
+
+	yaDP.EnsureTokenInfo()
+	yaDP.RefreshTokenIsNeed()
+	yaDP.EnsureYandexDisk()
 
 	// Создаем рест
 	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, &logger)

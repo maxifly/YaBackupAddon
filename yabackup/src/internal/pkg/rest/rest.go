@@ -287,18 +287,6 @@ func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 
 	app.logger.DebugLog.Printf("%+v\n", filesInfo)
 
-	// --
-	// TODO Написать
-	//app.haApi.DownloadBackup("61e54d8d")
-	list, err := app.haApi.GetBackupInformationList()
-	if err != nil {
-		app.logger.ErrorLog.Printf("*** error %s", err)
-	}
-	app.logger.InfoLog.Printf("*** list size %d", len(list))
-	for _, info := range list {
-		app.logger.InfoLog.Printf("*** %+v", info)
-	}
-	// --
 	data := BackupResponse{BFiles: filesInfo,
 		AlertMessages: alertMessages,
 		IsDarkTheme:   app.isUseDarkTheme(),

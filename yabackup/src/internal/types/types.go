@@ -34,6 +34,7 @@ type BackupFileInfo struct {
 	IsLocal        bool
 	IsRemote       bool
 	IsNetwork      bool
+	Location       string
 }
 
 type LocalBackupFileInfo struct {
@@ -44,6 +45,7 @@ type LocalBackupFileInfo struct {
 	Path           string
 	IsLocal        bool
 	IsNetwork      bool
+	Location       string
 }
 
 type HaBackupInfo struct {

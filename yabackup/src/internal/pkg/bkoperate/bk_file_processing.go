@@ -97,7 +97,9 @@ func intersectFiles(
 			BackupSlug:     localFile.BackupSlug,
 			BackupName:     localFile.BackupName,
 			RemoteFileName: remoteFileName,
-			IsLocal:        true,
+			Location:       localFile.Location,
+			IsLocal:        localFile.IsLocal,
+			IsNetwork:      localFile.IsNetwork,
 			IsRemote:       isRemote,
 		}
 
@@ -192,15 +194,25 @@ func getLocalBackupFiles(haApi *haoperate.HaApiClient, logger *mylogger.Logger) 
 			BackupArchInfo: convertHaBackupInfoToBackupArchInfo(information),
 			BackupSlug:     information.Slug,
 			BackupName:     information.Name,
-			IsNetwork:      !isLocal || len(information.Locations) > 0,
+			IsNetwork:      !isLocal || hasNonEmptyElement(&information.Locations),
 			IsLocal:        isLocal,
 			Path:           filePath,
+			Location:       strings.TrimSpace(information.Location),
 		}
 
 	}
 
 	return result, nil
 
+}
+
+func hasNonEmptyElement(arr *[]string) bool {
+	for _, str := range *arr {
+		if str != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func findFile(files *[]string, slug string) (string, error) {

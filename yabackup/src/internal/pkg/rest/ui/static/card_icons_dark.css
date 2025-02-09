@@ -21,6 +21,10 @@
     content: url("cloud_dark.png");
 }
 
+.icon.nas {
+    content: url("nas_dark.png");
+}
+
 .icon.filesize {
     content: url("elephant_dark.png");
 }
@@ -47,5 +51,9 @@
 }
 
 .icon.cloud.hidden {
+    visibility: hidden
+}
+
+.icon.nas.hidden {
     visibility: hidden
 }
