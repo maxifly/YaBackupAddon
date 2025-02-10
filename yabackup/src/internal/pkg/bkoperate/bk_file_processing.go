@@ -101,6 +101,7 @@ func intersectFiles(
 			IsLocal:        localFile.IsLocal,
 			IsNetwork:      localFile.IsNetwork,
 			IsRemote:       isRemote,
+			IsProtected:    localFile.IsProtected,
 		}
 
 		if isRemote {
@@ -194,6 +195,7 @@ func getLocalBackupFiles(haApi *haoperate.HaApiClient, logger *mylogger.Logger) 
 			BackupArchInfo: convertHaBackupInfoToBackupArchInfo(information),
 			BackupSlug:     information.Slug,
 			BackupName:     information.Name,
+			IsProtected:    information.Protected,
 			IsNetwork:      !isLocal || hasNonEmptyElement(&information.Locations),
 			IsLocal:        isLocal,
 			Path:           filePath,

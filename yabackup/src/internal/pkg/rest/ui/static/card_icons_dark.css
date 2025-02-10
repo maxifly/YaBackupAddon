@@ -41,6 +41,10 @@
     content: url("clock-dark.png");
 }
 
+.icon.protected {
+    content: url("key-dark.png");
+}
+
 .icon.clock_out {
     content: url("clock-out-dark.png");
 }
