@@ -22,6 +22,11 @@ type GeneralFileInfo struct {
 	Modified FileModified
 }
 
+type NetworkFileInfo struct {
+	Slug     string
+	Location string
+}
+
 type RemoteFileInfo GeneralFileInfo
 
 type BackupFileInfo struct {
@@ -83,8 +88,11 @@ type BackupArchInfo struct {
 }
 
 type ForUploadFileInfo struct {
-	LocalFileInfo  GeneralFileInfo
-	RemoteFileName string
+	LocalFileInfo   GeneralFileInfo
+	NetworkFileInfo NetworkFileInfo
+	RemoteFileName  string
+	IsLocal         bool
+	IsNetwork       bool
 }
 type ForDeleteFileInfo struct {
 	RemoteFileName string

@@ -390,7 +390,7 @@ func UploadTask(app *Rest) {
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error get backup files %s", err)
 	}
-	filesToUpload := bkoperate.ChooseFilesToUpload(filesInfo)
+	filesToUpload := app.bKProcessor.ChooseFilesToUpload(filesInfo)
 	app.logger.InfoLog.Printf("Need upload %d files", len(filesToUpload))
 
 	uploadedFileAmount := len(filesToUpload)

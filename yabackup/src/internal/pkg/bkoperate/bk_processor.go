@@ -3,6 +3,7 @@ package bkoperate
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
@@ -13,19 +14,30 @@ import (
 const BACKUP_PATH = "/backup"
 
 type BkProcessor struct {
-	YaDProcessor               *yadiskoperate.YaDProcessor
-	haApi                      *haoperate.HaApiClient
-	remoteMaximumFilesQuantity int
-	logger                     *mylogger.Logger
+	YaDProcessor                   *yadiskoperate.YaDProcessor
+	haApi                          *haoperate.HaApiClient
+	remoteMaximumFilesQuantity     int
+	enabledNetworkStorages         map[string]struct{}
+	enableUploadFromNetworkStorage bool
+	logger                         *mylogger.Logger
 }
 
 func NewBkProcessor(yaDP *yadiskoperate.YaDProcessor, haApi *haoperate.HaApiClient,
-	remoteMaximumFilesQuantity int, logger *mylogger.Logger) *BkProcessor {
+	remoteMaximumFilesQuantity int, enableUploadFromNetworkStorage bool,
+	enabledNetworkStorages []string,
+	logger *mylogger.Logger) *BkProcessor {
+
+	m := make(map[string]struct{})
+	for _, element := range enabledNetworkStorages {
+		m[strings.TrimSpace(element)] = struct{}{}
+	}
 	return &BkProcessor{
-		YaDProcessor:               yaDP,
-		haApi:                      haApi,
-		remoteMaximumFilesQuantity: remoteMaximumFilesQuantity,
-		logger:                     logger,
+		YaDProcessor:                   yaDP,
+		haApi:                          haApi,
+		remoteMaximumFilesQuantity:     remoteMaximumFilesQuantity,
+		enableUploadFromNetworkStorage: enableUploadFromNetworkStorage,
+		enabledNetworkStorages:         m,
+		logger:                         logger,
 	}
 }
 
@@ -42,6 +54,52 @@ func (bkp *BkProcessor) GetFilesInfo() ([]types.BackupFileInfo, error) {
 	}
 
 	return intersectFiles(localFiles, remoteFiles)
+}
+
+func (bkp *BkProcessor) ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo {
+	result := make([]types.ForUploadFileInfo, 0)
+	for _, file := range files {
+
+		if !file.IsRemote {
+			// Файл ещё не загружен
+			if file.IsLocal {
+				// Файл локальный. Грузится всегда
+				result = append(result, types.ForUploadFileInfo{
+					LocalFileInfo:  file.GeneralInfo,
+					RemoteFileName: file.RemoteFileName,
+					IsLocal:        true,
+					IsNetwork:      false,
+				})
+			} else if file.IsNetwork && bkp.enableUploadFromNetworkStorage && bkp.isNetworkStorageEnabled(file.Location) {
+				// Файл из сетевого хранилища. Разрешён к загрузке
+				result = append(result, types.ForUploadFileInfo{
+					LocalFileInfo:  file.GeneralInfo,
+					RemoteFileName: file.RemoteFileName,
+					NetworkFileInfo: types.NetworkFileInfo{
+						Slug:     file.BackupSlug,
+						Location: file.Location,
+					},
+					IsLocal:   false,
+					IsNetwork: true,
+				})
+			}
+		}
+	}
+	return result
+}
+
+func (bkp *BkProcessor) isNetworkStorageEnabled(storage string) bool {
+	if len(bkp.enabledNetworkStorages) == 0 {
+		bkp.logger.DebugLog.Println("Enabled upload from any network storage")
+		return true
+	}
+	_, ok := bkp.enabledNetworkStorages[strings.TrimSpace(storage)]
+	if ok {
+		bkp.logger.DebugLog.Printf("Enabled upload from '%s' network storage", storage)
+	} else {
+		bkp.logger.DebugLog.Printf("Disabled upload from '%s' network storage", storage)
+	}
+	return ok
 }
 
 func (bkp *BkProcessor) UploadFiles(files []types.ForUploadFileInfo) (ProcessedFilesResult, error) {

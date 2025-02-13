@@ -57,18 +57,19 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 		err
 }
 
-func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo {
-	result := make([]types.ForUploadFileInfo, 0)
-	for _, file := range files {
-		if file.IsLocal && !file.IsRemote {
-			result = append(result, types.ForUploadFileInfo{
-				LocalFileInfo:  file.GeneralInfo,
-				RemoteFileName: file.RemoteFileName,
-			})
-		}
-	}
-	return result
-}
+// TODO for delete
+//func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo {
+//	result := make([]types.ForUploadFileInfo, 0)
+//	for _, file := range files {
+//		if file.IsLocal && !file.IsRemote {
+//			result = append(result, types.ForUploadFileInfo{
+//				LocalFileInfo:  file.GeneralInfo,
+//				RemoteFileName: file.RemoteFileName,
+//			})
+//		}
+//	}
+//	return result
+//}
 
 type stringSet map[string]bool
 type remoteFilesMap map[string]types.RemoteFileInfo

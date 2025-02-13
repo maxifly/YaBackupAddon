@@ -30,14 +30,20 @@ type YbgApp struct {
 }
 
 type ApplOptions struct {
-	ClientId                   string `json:"client_id"`
-	ClientSecret               string `json:"client_secret"`
-	RemotePath                 string `json:"remote_path"`
-	RemoteMaximumFilesQuantity int    `json:"remote_maximum_files_quantity"`
-	Schedule                   string `json:"schedule"`
-	LogLevel                   string `json:"log_level"`
-	Theme                      string `json:"theme" default:"Light"`
-	EntityId                   string `json:"entity_id" default:"yandex_backup_state"`
+	ClientId                       string                  `json:"client_id"`
+	ClientSecret                   string                  `json:"client_secret"`
+	RemotePath                     string                  `json:"remote_path"`
+	RemoteMaximumFilesQuantity     int                     `json:"remote_maximum_files_quantity"`
+	Schedule                       string                  `json:"schedule"`
+	LogLevel                       string                  `json:"log_level"`
+	Theme                          string                  `json:"theme" default:"Light"`
+	EntityId                       string                  `json:"entity_id" default:"yandex_backup_state"`
+	EnabledNetworkStorages         []EnabledNetworkStorage `json:"enabled_network_storages"`
+	EnableUploadFromNetworkStorage bool                    `json:"enabled_network_storages"`
+}
+
+type EnabledNetworkStorage struct {
+	Name string `json:"name"`
 }
 
 func NewYbg(port string) *YbgApp {
@@ -83,7 +89,14 @@ func NewYbg(port string) *YbgApp {
 	}
 
 	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
-	bkP := bkoperate.NewBkProcessor(yaDP, haApi, options.RemoteMaximumFilesQuantity, &logger)
+
+	enabledNetworkStorages := make([]string, len(options.EnabledNetworkStorages))
+
+	for i, element := range options.EnabledNetworkStorages {
+		enabledNetworkStorages[i] = element.Name
+	}
+
+	bkP := bkoperate.NewBkProcessor(yaDP, haApi, options.RemoteMaximumFilesQuantity, options.EnableUploadFromNetworkStorage, enabledNetworkStorages, &logger)
 
 	yaDP.EnsureTokenInfo()
 	yaDP.RefreshTokenIsNeed()
