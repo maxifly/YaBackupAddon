@@ -39,7 +39,7 @@ type ApplOptions struct {
 	Theme                          string                  `json:"theme" default:"Light"`
 	EntityId                       string                  `json:"entity_id" default:"yandex_backup_state"`
 	EnabledNetworkStorages         []EnabledNetworkStorage `json:"enabled_network_storages"`
-	EnableUploadFromNetworkStorage bool                    `json:"enabled_network_storages"`
+	EnableUploadFromNetworkStorage bool                    `json:"upload_from_network_storage"`
 }
 
 type EnabledNetworkStorage struct {

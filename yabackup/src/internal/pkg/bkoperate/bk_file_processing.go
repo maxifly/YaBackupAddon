@@ -33,16 +33,30 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 	processedSize := types.FileSize(0)
 
 	for _, file := range files {
-		sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
-		app.logger.DebugLog.Printf("Try upload %s ", sourceName)
-		err := app.YaDProcessor.UploadFile(sourceName, file.RemoteFileName)
-		if err != nil {
-			app.logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
-			isError = true
-			errorUploaded++
-		} else {
-			uploaded++
-			processedSize += file.LocalFileInfo.Size
+
+		if file.IsLocal {
+			sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
+			app.logger.DebugLog.Printf("Try upload %s ", sourceName)
+			err := app.YaDProcessor.UploadFile(sourceName, file.RemoteFileName)
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
+				isError = true
+				errorUploaded++
+			} else {
+				uploaded++
+				processedSize += file.LocalFileInfo.Size
+			}
+		} else if file.IsNetwork {
+			app.logger.DebugLog.Printf("Try upload network file %s ", file.NetworkFileInfo.Slug)
+			err := app.YaDProcessor.UploadDataFromSlug(app.haApi, file.NetworkFileInfo.Slug, file.RemoteFileName)
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error when upload network file %s. Err: %s", file.NetworkFileInfo.Slug, err)
+				isError = true
+				errorUploaded++
+			} else {
+				uploaded++
+				processedSize += file.LocalFileInfo.Size
+			}
 		}
 	}
 

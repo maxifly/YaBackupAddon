@@ -402,7 +402,7 @@ func (haApi *HaApiClient) DownloadBackup(slug string) (int, error) {
 
 	defer resp.Body.Close()
 
-	haApi.logger.ErrorLog.Printf("response result %+v", resp)
+	haApi.logger.ErrorLog.Printf("*** response result %+v", resp)
 
 	return 123, nil
 

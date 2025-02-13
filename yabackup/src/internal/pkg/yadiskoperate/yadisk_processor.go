@@ -4,8 +4,10 @@ import (
 	"fmt"
 	uploadbig "github.com/maxifly/upload-big-file"
 	yadisk "github.com/nikitaksv/yandex-disk-sdk-go"
+	"io"
 	"net/http"
 	"time"
+	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
@@ -144,8 +146,16 @@ func (app *YaDProcessor) GetRemoteFiles() ([]types.RemoteFileInfo, error) {
 	return result, nil
 
 }
-
 func (app *YaDProcessor) UploadFile(source string, destinationFileName string) error {
+	return app.innerUpload(source, nil, 0, destinationFileName)
+}
+func (app *YaDProcessor) UploadDataFromSlug(haApi *haoperate.HaApiClient, slug string, destinationFileName string) error {
+	haApi.DownloadBackup(slug)
+	return fmt.Errorf("test error")
+
+}
+
+func (app *YaDProcessor) innerUpload(source string, reader *io.Reader, size int64, destinationFileName string) error {
 	destination := app.remotePath + "/" + destinationFileName
 	app.logger.DebugLog.Printf("Try upload %s into %s", source, destination)
 	link, err := (*app.yaDisk).GetResourceUploadLink(destination, nil, true)
@@ -162,7 +172,16 @@ func (app *YaDProcessor) UploadFile(source string, destinationFileName string) e
 		ErrorLog: app.logger.ErrorLog,
 	}
 
-	uploader := uploadbig.New(types.PUT, link.Href, source, httpClient, int(types.MiB), &logger)
+	var uploader *uploadbig.UploadData = nil
+
+	switch {
+	case source != "":
+		uploader = uploadbig.NewUploaderFromFile(types.PUT, link.Href, source, httpClient, int(types.MiB), &logger)
+	case reader != nil:
+		uploader = uploadbig.NewUploaderFromReader(types.PUT, link.Href, reader, size, httpClient, int(types.MiB), &logger)
+	default:
+		return fmt.Errorf("unsupported upload source")
+	}
 
 	err = uploader.Init()
 	if err != nil {
