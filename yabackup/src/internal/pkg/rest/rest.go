@@ -383,7 +383,6 @@ func (app *Rest) upload1(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, uri+"/", http.StatusSeeOther)
 }
 
-// UploadTask TODO Может перенести в bk_processor
 func UploadTask(app *Rest) {
 	app.yaDProcessor.RefreshTokenIsNeed()
 	filesInfo, err := app.bKProcessor.GetFilesInfo()

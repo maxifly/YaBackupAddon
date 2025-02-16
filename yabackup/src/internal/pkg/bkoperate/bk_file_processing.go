@@ -71,20 +71,6 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 		err
 }
 
-// TODO for delete
-//func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo {
-//	result := make([]types.ForUploadFileInfo, 0)
-//	for _, file := range files {
-//		if file.IsLocal && !file.IsRemote {
-//			result = append(result, types.ForUploadFileInfo{
-//				LocalFileInfo:  file.GeneralInfo,
-//				RemoteFileName: file.RemoteFileName,
-//			})
-//		}
-//	}
-//	return result
-//}
-
 type stringSet map[string]bool
 type remoteFilesMap map[string]types.RemoteFileInfo
 
@@ -171,7 +157,6 @@ func generateRemoteFileName(localFile types.LocalBackupFileInfo) string {
 }
 
 func getLocalBackupFiles(haApi *haoperate.HaApiClient, logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
-	// TODO Переделать на использование результата РЕСТ запроса
 	fileNames, err := getAllFileNames(logger, BACKUP_PATH)
 	if err != nil {
 		return nil, err
@@ -298,47 +283,6 @@ func getAllFileNames(logger *mylogger.Logger, path string) ([]string, error) {
 		result[i] = entry.Name()
 	}
 	return result, nil
-}
-
-func getLocalBackupFilesByPath(logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
-	// TODO Удалить
-	entries, err := os.ReadDir(BACKUP_PATH)
-	if err != nil {
-		logger.ErrorLog.Printf("Unable to read backup %s. %v", BACKUP_PATH, err)
-		return nil, fmt.Errorf("error when read local backups")
-	}
-	result := make(map[string]types.LocalBackupFileInfo)
-	for _, entry := range entries {
-		logger.DebugLog.Printf("entry %+v", entry)
-		info, err := entry.Info()
-		if err != nil {
-			logger.ErrorLog.Printf("Error read file info %v", err)
-			continue
-		}
-		logger.DebugLog.Printf("info: %+v", info)
-
-		if info.IsDir() {
-			continue
-		}
-
-		filePath := filepath.Join(BACKUP_PATH, info.Name())
-		logger.DebugLog.Printf("Read %s", filePath)
-		archInfo, err := extractArchInfo(logger, filePath)
-		if err != nil {
-			logger.ErrorLog.Printf("Error extract slug from %s %v", info.Name(), err)
-			continue
-		}
-
-		result[archInfo.Slug] = types.LocalBackupFileInfo{
-			GeneralInfo:    convertBkFileInfoToGeneral(&info),
-			BackupArchInfo: archInfo,
-			BackupSlug:     archInfo.Slug,
-			BackupName:     archInfo.Name,
-			Path:           filePath,
-		}
-	}
-	return result, nil
-
 }
 
 func convertBkFileInfoToGeneral(bkFileInfo *fs.FileInfo) types.GeneralFileInfo {

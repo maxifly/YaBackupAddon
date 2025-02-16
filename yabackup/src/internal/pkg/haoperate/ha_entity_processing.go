@@ -290,41 +290,6 @@ func (haApi *HaApiClient) GetBackupInformation(slug string) (*HaBackupInfo, erro
 	return &result.HaBackupInformation, nil
 }
 
-func (haApi *HaApiClient) GetBackupInformationList() ([]HaBackupInfo, error) {
-	list, err := haApi.GetBackupSlugsList()
-	if err != nil {
-		return nil, err
-	}
-	result := make([]HaBackupInfo, len(list.Backups))
-
-	for i, element := range list.Backups {
-		information, err := haApi.GetBackupInformation(element.Slug)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = *information
-	}
-
-	return result, nil
-}
-
-func (haApi *HaApiClient) GetBackupList() (*Addons, error) {
-	//TODO Переделать или удалить
-	haApi.logger.DebugLog.Println("Get backups request")
-	url := fmt.Sprintf("%s/1701c753/info", BackupBaseURL)
-	url2 := fmt.Sprintf("%s/info", BackupBaseURL)
-	var addonsList getAddonsResult
-	var addonsList2 getAddonsResult
-	err := haApi.getJson(url, &addonsList)
-	haApi.getJson(url2, &addonsList2)
-	if err != nil {
-		resultError := fmt.Errorf("error when get backups: %v", err)
-		return nil, resultError
-	}
-
-	return nil, nil
-}
-
 func (haApi *HaApiClient) getJson(url string, result interface{}) error {
 	haApi.logger.DebugLog.Printf("Execute get request %s", url)
 
@@ -364,8 +329,6 @@ func (haApi *HaApiClient) getJson(url string, result interface{}) error {
 		haApi.logger.ErrorLog.Println(resultError)
 		return resultError
 	}
-
-	//haApi.logger.InfoLog.Printf("*** url: %s body: %s", url, string(body))
 
 	// Декодируем JSON-ответ
 	if err := json.Unmarshal(body, result); err != nil {
