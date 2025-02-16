@@ -150,8 +150,26 @@ func (app *YaDProcessor) UploadFile(source string, destinationFileName string) e
 	return app.innerUpload(source, nil, 0, destinationFileName)
 }
 func (app *YaDProcessor) UploadDataFromSlug(haApi *haoperate.HaApiClient, slug string, destinationFileName string) error {
-	haApi.DownloadBackup(slug)
-	return fmt.Errorf("test error")
+	size, body, err := haApi.GetDownloadBackupBody(slug)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when upload network file: %w", err)
+		return fmt.Errorf("error when upload network file: %w", err)
+	}
+	defer body.Close()
+
+	if size == 0 {
+		app.logger.ErrorLog.Printf("Can not upload network file with 0 size.")
+		return fmt.Errorf("ean not upload network file with 0 size")
+	}
+
+	var reader io.Reader = body
+
+	err = app.innerUpload("", &reader, size, destinationFileName)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when upload network file %w", err)
+		return err
+	}
+	return nil
 
 }
 
