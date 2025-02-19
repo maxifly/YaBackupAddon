@@ -1,6 +1,6 @@
 name: "Yandex backup"
 description: "Copy HA backup to YandexDisk"
-version: "2.01.1"
+version: "2.01.2"
 slug: "yabackup"
 url: "https://github.com/maxifly/YaBackupAddon/tree/main/yabackup"
 image: "ghcr.io/maxifly/yabackupaddon/yabackup-{arch}"
@@ -25,6 +25,8 @@ options:
   remote_path: "/ha_test"
   remote_maximum_files_quantity: 10
   schedule: "1 2 * * *"
+  upload_from_network_storage: false
+  enabled_network_storages: []
   log_level: INFO
   theme: Light
 
@@ -34,6 +36,9 @@ schema:
   remote_path: str
   remote_maximum_files_quantity: "int(0,)"
   schedule: str
+  upload_from_network_storage: bool
+  enabled_network_storages:
+    - name: str
   log_level: "list(DEBUG|INFO|WARNING|ERROR)"
   theme: "list(Light|Dark)"
   entity_id: "str?"

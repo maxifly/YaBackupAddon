@@ -286,6 +286,7 @@ func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.logger.DebugLog.Printf("%+v\n", filesInfo)
+
 	data := BackupResponse{BFiles: filesInfo,
 		AlertMessages: alertMessages,
 		IsDarkTheme:   app.isUseDarkTheme(),
@@ -382,14 +383,13 @@ func (app *Rest) upload1(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, uri+"/", http.StatusSeeOther)
 }
 
-// UploadTask TODO Может перенести в bk_processor
 func UploadTask(app *Rest) {
 	app.yaDProcessor.RefreshTokenIsNeed()
 	filesInfo, err := app.bKProcessor.GetFilesInfo()
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error get backup files %s", err)
 	}
-	filesToUpload := bkoperate.ChooseFilesToUpload(filesInfo)
+	filesToUpload := app.bKProcessor.ChooseFilesToUpload(filesInfo)
 	app.logger.InfoLog.Printf("Need upload %d files", len(filesToUpload))
 
 	uploadedFileAmount := len(filesToUpload)

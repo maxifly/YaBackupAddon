@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
@@ -17,6 +18,7 @@ import (
 const (
 	CoreBaseURL         string = "http://supervisor/core/api"
 	AddonsBaseURL       string = "http://supervisor/addons"
+	BackupBaseURL       string = "http://supervisor/backups"
 	EntityIdPrefix      string = "sensor."
 	DefaultEntityId     string = "yandex_backup_state"
 	localEntityCopyPath string = "/data/entity-copy.json"
@@ -148,6 +150,39 @@ type getEntityStateResponse struct {
 	Attributes EntityAttributes `json:"attributes"`
 }
 
+type BackupSlugResponse struct {
+	Slug string `json:"slug"`
+}
+type BackupsSlugResponse struct {
+	Backups []BackupSlugResponse `json:"backups"`
+}
+type BackupsSlugDataResponse struct {
+	Data BackupsSlugResponse `json:"data"`
+}
+
+type HaBackupInformationResponse struct {
+	HaBackupInformation HaBackupInfo `json:"data"`
+}
+type HaBackupInfo struct {
+	Slug                string                      `json:"slug"`
+	Name                string                      `json:"name"`
+	BackupType          string                      `json:"type"`
+	HaSupervisorVersion string                      `json:"supervisor_version"`
+	HaCoreVersion       string                      `json:"homeassistant"`
+	BackupCreated       types.CustomTimeRFC3339Nano `json:"date"`
+	Folders             []string                    `json:"folders"`
+	Addons              []HaAddonInfo               `json:"addons"`
+	Protected           bool                        `json:"protected"`
+	Size                int64                       `json:"size_bytes"`
+	Location            string                      `json:"location"`
+	Locations           []string                    `json:"locations"`
+}
+type HaAddonInfo struct {
+	Slug    string `json:"slug"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 func NewHaApi(entity_id string, ctx context.Context, client *http.Client, token string, logger *mylogger.Logger) (*HaApiClient, error) {
 	if token == "" {
 		return nil, errors.New("required token")
@@ -167,52 +202,10 @@ func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
 	haApi.logger.DebugLog.Println("Get entity request")
 	url := fmt.Sprintf("%s/states/%s", CoreBaseURL, haApi.entity_id)
-
-	// Создаем новый HTTP-запрос
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		resultError := fmt.Errorf("error when create request: %v", err)
-		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
-	}
-
-	// Устанавливаем заголовок авторизации
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
-	req.Header.Set("Accept", "application/json") // Ожидание ответа в формате JSON
-
-	// Выполняем запрос
-	resp, err := haApi.httpClient.Do(req)
-	if err != nil {
-		resultError := fmt.Errorf("error when execute request: %v", err)
-		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
-	}
-
-	defer resp.Body.Close()
-
-	// Проверяем статус код
-	if resp.StatusCode == http.StatusNotFound {
-		haApi.logger.InfoLog.Println("Entity not found")
-		return nil, nil
-	} else if resp.StatusCode != http.StatusOK {
-		resultError := fmt.Errorf("failed to fetch data: %s", resp.Status)
-		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
-	}
-
-	// Читаем тело ответа
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		resultError := fmt.Errorf("error when read body: %v", err)
-		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
-	}
-
-	// Декодируем JSON-ответ
 	var sensor getEntityStateResponse
-	if err := json.Unmarshal(body, &sensor); err != nil {
-		resultError := fmt.Errorf("error when parse body: %v", err)
-		haApi.logger.ErrorLog.Println(resultError)
+	err := haApi.getJson(url, &sensor)
+	if err != nil {
+		resultError := fmt.Errorf("error when get entity: %v", err)
 		return nil, resultError
 	}
 
@@ -257,13 +250,55 @@ func (haApi *HaApiClient) EnsureEntityState() error {
 func (haApi *HaApiClient) GetAddonList() (*Addons, error) {
 	haApi.logger.DebugLog.Println("Get addons request")
 	url := fmt.Sprintf("%s", AddonsBaseURL)
+	var addonsList getAddonsResult
+	err := haApi.getJson(url, &addonsList)
+	if err != nil {
+		resultError := fmt.Errorf("error when get addons: %v", err)
+		return nil, resultError
+	}
+	haApi.logger.DebugLog.Printf("Get addons result %v", addonsList)
+	return addonsList.Data, nil
+}
+
+func (haApi *HaApiClient) GetBackupSlugsList() (*BackupsSlugResponse, error) {
+	haApi.logger.DebugLog.Println("Get backup slugs request")
+	url := fmt.Sprintf("%s", BackupBaseURL)
+	var result BackupsSlugDataResponse
+
+	err := haApi.getJson(url, &result)
+
+	if err != nil {
+		resultError := fmt.Errorf("error when get backups: %v", err)
+		return nil, resultError
+	}
+
+	return &result.Data, nil
+}
+
+func (haApi *HaApiClient) GetBackupInformation(slug string) (*HaBackupInfo, error) {
+	haApi.logger.DebugLog.Println("Get backup slugs request")
+	url := fmt.Sprintf("%s/%s/info", BackupBaseURL, slug)
+	var result HaBackupInformationResponse
+
+	err := haApi.getJson(url, &result)
+
+	if err != nil {
+		resultError := fmt.Errorf("error when get backups: %v", err)
+		return nil, resultError
+	}
+
+	return &result.HaBackupInformation, nil
+}
+
+func (haApi *HaApiClient) getJson(url string, result interface{}) error {
+	haApi.logger.DebugLog.Printf("Execute get request %s", url)
 
 	// Создаем новый HTTP-запрос
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		resultError := fmt.Errorf("error when create request: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
+		return resultError
 	}
 
 	// Устанавливаем заголовок авторизации
@@ -275,7 +310,7 @@ func (haApi *HaApiClient) GetAddonList() (*Addons, error) {
 	if err != nil {
 		resultError := fmt.Errorf("error when execute request: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
+		return resultError
 	}
 
 	defer resp.Body.Close()
@@ -284,7 +319,7 @@ func (haApi *HaApiClient) GetAddonList() (*Addons, error) {
 	if resp.StatusCode != http.StatusOK {
 		resultError := fmt.Errorf("failed to fetch data: %s", resp.Status)
 		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
+		return resultError
 	}
 
 	// Читаем тело ответа
@@ -292,18 +327,83 @@ func (haApi *HaApiClient) GetAddonList() (*Addons, error) {
 	if err != nil {
 		resultError := fmt.Errorf("error when read body: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
+		return resultError
 	}
 
 	// Декодируем JSON-ответ
-	var addonsList getAddonsResult
-	if err := json.Unmarshal(body, &addonsList); err != nil {
+	if err := json.Unmarshal(body, result); err != nil {
 		resultError := fmt.Errorf("error when parse body: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
-		return nil, resultError
+		return resultError
 	}
-	haApi.logger.DebugLog.Printf("Get addons result %v", addonsList)
-	return addonsList.Data, nil
+	haApi.logger.DebugLog.Printf("Get result %v", result)
+	return nil
+}
+
+func (haApi *HaApiClient) GetDownloadBackupBody(slug string) (int64, io.ReadCloser, error) {
+	haApi.logger.DebugLog.Println("Get addons request")
+	url := fmt.Sprintf("%s/%s/download", BackupBaseURL, slug)
+
+	// Создаем новый HTTP-запрос
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		resultError := fmt.Errorf("error when create request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return 0, nil, resultError
+	}
+
+	// Устанавливаем заголовок авторизации
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", haApi.token))
+	//req.Header.Set("Accept", "application/json") // Ожидание ответа в формате JSON
+
+	// Выполняем запрос
+	resp, err := haApi.httpClient.Do(req)
+	if err != nil {
+		resultError := fmt.Errorf("error when execute request: %v", err)
+		haApi.logger.ErrorLog.Println(resultError)
+		return 0, nil, resultError
+	}
+
+	// Получаем значение заголовка Content-Length
+	contentLengthStr := resp.Header.Get("Content-Length")
+	if contentLengthStr == "" {
+		resp.Body.Close()
+		return 0, nil, fmt.Errorf("can not get Content-Length headre from response")
+	}
+
+	// Преобразуем Content-Length из строки в число
+	contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
+	if err != nil {
+		resp.Body.Close()
+		return 0, nil, fmt.Errorf("error when convert Content-Length value to integer: %w", err)
+	}
+
+	return contentLength, resp.Body, nil
+
+	//// Проверяем статус код
+	//if resp.StatusCode != http.StatusOK {
+	//	resultError := fmt.Errorf("failed to fetch data: %s", resp.Status)
+	//	haApi.logger.ErrorLog.Println(resultError)
+	//	return 123, resultError
+	//}
+	//
+	//// Читаем тело ответа
+	//body, err := io.ReadAll(resp.Body)
+	//if err != nil {
+	//	resultError := fmt.Errorf("error when read body: %v", err)
+	//	haApi.logger.ErrorLog.Println(resultError)
+	//	return 123, resultError
+	//}
+	//
+	//// Декодируем JSON-ответ
+	//var addonsList getAddonsResult
+	//if err := json.Unmarshal(body, &addonsList); err != nil {
+	//	resultError := fmt.Errorf("error when parse body: %v", err)
+	//	haApi.logger.ErrorLog.Println(resultError)
+	//	return 123, resultError
+	//}
+	//haApi.logger.DebugLog.Printf("Get addons result %v", addonsList)
+	//return 124, nil
 }
 
 func (haApi *HaApiClient) SaveAddonIcon(slug string) (string, error) {
