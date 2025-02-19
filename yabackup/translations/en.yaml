@@ -1,0 +1,32 @@
+---
+configuration:
+  client_id:
+    name: client_id
+    description: ClientId YandexDisk API
+  client_secret:
+    name: client_secret
+    description: Client secret YandexDisk API
+  remote_path:
+    name: remote_path
+    description: The directory on Yandex.Disk where backups are transferred
+  remote_maximum_files_quantity:
+    name: remote_maximum_files_quantity
+    description: Maximum number backups on Yandex.Disk
+  schedule:
+    name: schedule
+    description: Upload schedule (cron notation)
+  upload_from_network_storage:
+    name: upload_from_network_storage
+    description: Permission to upload from network storage
+  enabled_network_storages:
+    name: enabled_network_storages
+    description: Network storage allowed for uploading (empty = all)
+  log_level:
+    name: log_level
+    description: Log level
+  theme:
+    name: theme
+    description: Theme
+  entity_id:
+    name: entity_id
+    description: EntityId containing the state
