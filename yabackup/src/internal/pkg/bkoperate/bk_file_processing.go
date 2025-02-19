@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
@@ -32,16 +33,30 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 	processedSize := types.FileSize(0)
 
 	for _, file := range files {
-		sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
-		app.logger.DebugLog.Printf("Try upload %s ", sourceName)
-		err := app.YaDProcessor.UploadFile(sourceName, file.RemoteFileName)
-		if err != nil {
-			app.logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
-			isError = true
-			errorUploaded++
-		} else {
-			uploaded++
-			processedSize += file.LocalFileInfo.Size
+
+		if file.IsLocal {
+			sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
+			app.logger.DebugLog.Printf("Try upload %s ", sourceName)
+			err := app.YaDProcessor.UploadFile(sourceName, file.RemoteFileName)
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
+				isError = true
+				errorUploaded++
+			} else {
+				uploaded++
+				processedSize += file.LocalFileInfo.Size
+			}
+		} else if file.IsNetwork {
+			app.logger.DebugLog.Printf("Try upload network file %s ", file.NetworkFileInfo.Slug)
+			err := app.YaDProcessor.UploadDataFromSlug(app.haApi, file.NetworkFileInfo.Slug, file.RemoteFileName)
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error when upload network file %s. Err: %s", file.NetworkFileInfo.Slug, err)
+				isError = true
+				errorUploaded++
+			} else {
+				uploaded++
+				processedSize += file.LocalFileInfo.Size
+			}
 		}
 	}
 
@@ -54,19 +69,6 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 			Error:         errorUploaded,
 			ProcessedSize: processedSize},
 		err
-}
-
-func ChooseFilesToUpload(files []types.BackupFileInfo) []types.ForUploadFileInfo {
-	result := make([]types.ForUploadFileInfo, 0)
-	for _, file := range files {
-		if file.IsLocal && !file.IsRemote {
-			result = append(result, types.ForUploadFileInfo{
-				LocalFileInfo:  file.GeneralInfo,
-				RemoteFileName: file.RemoteFileName,
-			})
-		}
-	}
-	return result
 }
 
 type stringSet map[string]bool
@@ -96,8 +98,11 @@ func intersectFiles(
 			BackupSlug:     localFile.BackupSlug,
 			BackupName:     localFile.BackupName,
 			RemoteFileName: remoteFileName,
-			IsLocal:        true,
+			Location:       localFile.Location,
+			IsLocal:        localFile.IsLocal,
+			IsNetwork:      localFile.IsNetwork,
 			IsRemote:       isRemote,
+			IsProtected:    localFile.IsProtected,
 		}
 
 		if isRemote {
@@ -151,45 +156,133 @@ func generateRemoteFileName(localFile types.LocalBackupFileInfo) string {
 	return strings.ReplaceAll(strings.ReplaceAll(localFile.BackupName+"_"+localFile.BackupSlug, " ", "-"), ":", "_")
 }
 
-func getLocalBackupFiles(logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
+func getLocalBackupFiles(haApi *haoperate.HaApiClient, logger *mylogger.Logger) (map[string]types.LocalBackupFileInfo, error) {
+	fileNames, err := getAllFileNames(logger, BACKUP_PATH)
+	if err != nil {
+		return nil, err
+	}
 
-	entries, err := os.ReadDir(BACKUP_PATH)
+	list, err := haApi.GetBackupSlugsList()
+	if err != nil {
+		return nil, err
+	}
+	//result := make([]haoperate.HaBackupInfo, len(list.Backups))
+
+	result := make(map[string]types.LocalBackupFileInfo)
+
+	for _, element := range list.Backups {
+		information, err := haApi.GetBackupInformation(element.Slug)
+		if err != nil {
+			logger.ErrorLog.Printf("Error when get information about backup %s. %s", element, err)
+			continue
+		}
+
+		isLocal := information.Location == ""
+
+		fileName := ""
+		filePath := ""
+
+		if isLocal {
+			fileName, err = findFile(&fileNames, information.Slug)
+			if err != nil {
+				return nil, err
+			}
+			filePath = filepath.Join(BACKUP_PATH, fileName)
+		}
+
+		result[information.Slug] = types.LocalBackupFileInfo{
+			GeneralInfo:    convertHaBackupInfoToGeneral(information, fileName),
+			BackupArchInfo: convertHaBackupInfoToBackupArchInfo(information),
+			BackupSlug:     information.Slug,
+			BackupName:     information.Name,
+			IsProtected:    information.Protected,
+			IsNetwork:      !isLocal || hasNonEmptyElement(&information.Locations),
+			IsLocal:        isLocal,
+			Path:           filePath,
+			Location:       strings.TrimSpace(information.Location),
+		}
+
+	}
+
+	return result, nil
+
+}
+
+func hasNonEmptyElement(arr *[]string) bool {
+	for _, str := range *arr {
+		if str != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func findFile(files *[]string, slug string) (string, error) {
+	for _, str := range *files {
+		if strings.Contains(str, slug) {
+			return str, nil
+		}
+	}
+	return "", fmt.Errorf("file not found")
+}
+
+func convertHaBackupInfoToGeneral(haFileInfo *haoperate.HaBackupInfo, fileName string) types.GeneralFileInfo {
+	result := types.GeneralFileInfo{Name: fileName,
+		Size:     types.FileSize((*haFileInfo).Size),
+		Created:  types.FileModified((*haFileInfo).BackupCreated.Time),
+		Modified: types.FileModified((*haFileInfo).BackupCreated.Time),
+	}
+
+	if fileName == "" {
+		result.Name = (*haFileInfo).Name
+	}
+
+	return result
+}
+
+func convertHaBackupInfoToBackupArchInfo(haFileInfo *haoperate.HaBackupInfo) *types.BackupArchInfo {
+	haCoreInfo := types.HaCoreInfo{
+		Version: haFileInfo.HaCoreVersion,
+	}
+
+	return &types.BackupArchInfo{
+		Slug:          haFileInfo.Slug,
+		Name:          haFileInfo.Name,
+		BackupType:    haFileInfo.BackupType,
+		HaVersion:     haFileInfo.HaSupervisorVersion,
+		CoreInfo:      haCoreInfo,
+		BackupCreated: types.FileModified((*haFileInfo).BackupCreated.Time),
+		Folders:       haFileInfo.Folders,
+		Addons:        *convertAddonList(&haFileInfo.Addons),
+	}
+}
+
+func convertAddonList(haAddons *[]haoperate.HaAddonInfo) *[]types.HaAddonInfo {
+	result := make([]types.HaAddonInfo, len(*haAddons))
+
+	for i, element := range *haAddons {
+		result[i] = types.HaAddonInfo{
+			Slug:    element.Slug,
+			Name:    element.Name,
+			Version: element.Version,
+		}
+	}
+
+	return &result
+}
+
+func getAllFileNames(logger *mylogger.Logger, path string) ([]string, error) {
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		logger.ErrorLog.Printf("Unable to read backup %s. %v", BACKUP_PATH, err)
 		return nil, fmt.Errorf("error when read local backups")
 	}
-	result := make(map[string]types.LocalBackupFileInfo)
-	for _, entry := range entries {
-		logger.DebugLog.Printf("entry %+v", entry)
-		info, err := entry.Info()
-		if err != nil {
-			logger.ErrorLog.Printf("Error read file info %v", err)
-			continue
-		}
-		logger.DebugLog.Printf("info: %+v", info)
 
-		if info.IsDir() {
-			continue
-		}
-
-		filePath := filepath.Join(BACKUP_PATH, info.Name())
-		logger.DebugLog.Printf("Read %s", filePath)
-		archInfo, err := extractArchInfo(logger, filePath)
-		if err != nil {
-			logger.ErrorLog.Printf("Error extract slug from %s %v", info.Name(), err)
-			continue
-		}
-
-		result[archInfo.Slug] = types.LocalBackupFileInfo{
-			GeneralInfo:    convertBkFileInfoToGeneral(&info),
-			BackupArchInfo: archInfo,
-			BackupSlug:     archInfo.Slug,
-			BackupName:     archInfo.Name,
-			Path:           filePath,
-		}
+	result := make([]string, len(entries))
+	for i, entry := range entries {
+		result[i] = entry.Name()
 	}
 	return result, nil
-
 }
 
 func convertBkFileInfoToGeneral(bkFileInfo *fs.FileInfo) types.GeneralFileInfo {

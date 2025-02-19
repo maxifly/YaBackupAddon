@@ -30,14 +30,20 @@ type YbgApp struct {
 }
 
 type ApplOptions struct {
-	ClientId                   string `json:"client_id"`
-	ClientSecret               string `json:"client_secret"`
-	RemotePath                 string `json:"remote_path"`
-	RemoteMaximumFilesQuantity int    `json:"remote_maximum_files_quantity"`
-	Schedule                   string `json:"schedule"`
-	LogLevel                   string `json:"log_level"`
-	Theme                      string `json:"theme" default:"Light"`
-	EntityId                   string `json:"entity_id" default:"yandex_backup_state"`
+	ClientId                       string                  `json:"client_id"`
+	ClientSecret                   string                  `json:"client_secret"`
+	RemotePath                     string                  `json:"remote_path"`
+	RemoteMaximumFilesQuantity     int                     `json:"remote_maximum_files_quantity"`
+	Schedule                       string                  `json:"schedule"`
+	LogLevel                       string                  `json:"log_level"`
+	Theme                          string                  `json:"theme" default:"Light"`
+	EntityId                       string                  `json:"entity_id" default:"yandex_backup_state"`
+	EnabledNetworkStorages         []EnabledNetworkStorage `json:"enabled_network_storages"`
+	EnableUploadFromNetworkStorage bool                    `json:"upload_from_network_storage"`
+}
+
+type EnabledNetworkStorage struct {
+	Name string `json:"name"`
 }
 
 func NewYbg(port string) *YbgApp {
@@ -76,18 +82,25 @@ func NewYbg(port string) *YbgApp {
 		InfoLog:  infoLog,
 		DebugLog: debugLog}
 
-	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
-	bkP := bkoperate.NewBkProcessor(yaDP, options.RemoteMaximumFilesQuantity, &logger)
-
-	yaDP.EnsureTokenInfo()
-	yaDP.RefreshTokenIsNeed()
-	yaDP.EnsureYandexDisk()
 	haApi, err := createHaApiClient(&logger, options.EntityId)
-
 	if err != nil {
 		logger.ErrorLog.Printf("Error create HaApiClient %v", err)
 		//panic(fmt.Sprintf("error create HaApiClient %v", err))
 	}
+
+	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
+
+	enabledNetworkStorages := make([]string, len(options.EnabledNetworkStorages))
+
+	for i, element := range options.EnabledNetworkStorages {
+		enabledNetworkStorages[i] = element.Name
+	}
+
+	bkP := bkoperate.NewBkProcessor(yaDP, haApi, options.RemoteMaximumFilesQuantity, options.EnableUploadFromNetworkStorage, enabledNetworkStorages, &logger)
+
+	yaDP.EnsureTokenInfo()
+	yaDP.RefreshTokenIsNeed()
+	yaDP.EnsureYandexDisk()
 
 	// Создаем рест
 	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, &logger)

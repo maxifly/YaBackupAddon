@@ -22,6 +22,11 @@
                     <div class="col-md-6">
                         <p><img class="icon filesize me-2"><span id="backupSize"></span> Mb</p>
                     </div>
+                    <div id="protectedSection" class="col-md-6" style="display: none;">
+                        <p>
+                            <img class="icon protected me-2">protected <span
+                                id="fileProtected"></span></p>
+                    </div>
                     <div id="backupCreatedSection" class="col-md-6" style="display: none;">
                         <p>
                             <img class="icon clock me-2">Created: <span
@@ -152,6 +157,13 @@ data-core =
 '{"version":"{{.BackupArchInfo.CoreInfo.Version}}", "isHidden":0}'
 {{end}}
 
+data-isProtected =
+{{if .IsProtected }}
+1
+{{else}}
+0
+{{end}}
+
 data-isRemote =
 {{if .IsRemote }}
 1
@@ -176,6 +188,11 @@ data-isLocal =
     <img class="icon database">
     {{else}}
     <img class="icon database hidden">
+    {{end}}
+    {{if .IsNetwork}}
+    <img class="icon nas">
+    {{else}}
+    <img class="icon nas hidden">
     {{end}}
     {{if .IsRemote}}
     <img class="icon cloud">
@@ -215,6 +232,7 @@ data-isLocal =
             const backupType = this.getAttribute('data-backuptype');
             const backupSize = this.getAttribute('data-backupsize');
             const createdTime = this.getAttribute('data-createdtime');
+            const isShowProtected = this.getAttribute('data-isProtected');
             const isShowCreatedTime = this.getAttribute('data-isShowCreatedTime');
             const uploadedTime = this.getAttribute('data-uploadedTime');
             const isShowUploadedTime = this.getAttribute('data-isShowUploadedTime');
@@ -239,6 +257,12 @@ data-isLocal =
                 document.getElementById('coreVersionSection').style.display = 'block';
             } else {
                 document.getElementById('coreVersionSection').style.display = 'none';
+            }
+
+           if (isShowProtected == 1) {
+                document.getElementById('protectedSection').style.display = 'block';
+            } else {
+                document.getElementById('protectedSection').style.display = 'none';
             }
 
            if (isShowCreatedTime == 1) {

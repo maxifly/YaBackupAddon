@@ -22,6 +22,11 @@ type GeneralFileInfo struct {
 	Modified FileModified
 }
 
+type NetworkFileInfo struct {
+	Slug     string
+	Location string
+}
+
 type RemoteFileInfo GeneralFileInfo
 
 type BackupFileInfo struct {
@@ -33,6 +38,9 @@ type BackupFileInfo struct {
 	Downloaded     FileModified
 	IsLocal        bool
 	IsRemote       bool
+	IsNetwork      bool
+	IsProtected    bool
+	Location       string
 }
 
 type LocalBackupFileInfo struct {
@@ -41,6 +49,10 @@ type LocalBackupFileInfo struct {
 	BackupSlug     string
 	BackupName     string
 	Path           string
+	IsLocal        bool
+	IsNetwork      bool
+	IsProtected    bool
+	Location       string
 }
 
 type HaBackupInfo struct {
@@ -52,6 +64,7 @@ type HaBackupInfo struct {
 	BackupCreated CustomTimeRFC3339Nano `json:"date"`
 	Folders       []string              `json:"folders"`
 	Addons        []HaAddonInfo         `json:"addons"`
+	Crypto        string                `json:"crypto"`
 }
 type HaAddonInfo struct {
 	Slug    string `json:"slug"`
@@ -75,8 +88,11 @@ type BackupArchInfo struct {
 }
 
 type ForUploadFileInfo struct {
-	LocalFileInfo  GeneralFileInfo
-	RemoteFileName string
+	LocalFileInfo   GeneralFileInfo
+	NetworkFileInfo NetworkFileInfo
+	RemoteFileName  string
+	IsLocal         bool
+	IsNetwork       bool
 }
 type ForDeleteFileInfo struct {
 	RemoteFileName string

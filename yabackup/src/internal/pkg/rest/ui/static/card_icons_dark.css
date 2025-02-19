@@ -21,6 +21,10 @@
     content: url("cloud_dark.png");
 }
 
+.icon.nas {
+    content: url("nas_dark.png");
+}
+
 .icon.filesize {
     content: url("elephant_dark.png");
 }
@@ -37,6 +41,10 @@
     content: url("clock-dark.png");
 }
 
+.icon.protected {
+    content: url("key-dark.png");
+}
+
 .icon.clock_out {
     content: url("clock-out-dark.png");
 }
@@ -47,5 +55,9 @@
 }
 
 .icon.cloud.hidden {
+    visibility: hidden
+}
+
+.icon.nas.hidden {
     visibility: hidden
 }

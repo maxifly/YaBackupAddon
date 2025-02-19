@@ -1,4 +1,11 @@
 # Changelog
+## 2.01.2
+**Change config** (add configuration parameter. May be need full reinstall).
+
+- Add get information from network storage.  [#20](https://github.com/maxifly/YaBackupAddon/issues/20)
+- Add upload from network storage.  [#25](https://github.com/maxifly/YaBackupAddon/issues/25)
+- Add key icon for protected backup.  [#24](https://github.com/maxifly/YaBackupAddon/issues/24)
+
 ## 2.01.1
 - Old backup deleted permanently. Trashcan not used.  [#21](https://github.com/maxifly/YaBackupAddon/issues/21)
 - Fix uploaded time.  [#18](https://github.com/maxifly/YaBackupAddon/issues/18)

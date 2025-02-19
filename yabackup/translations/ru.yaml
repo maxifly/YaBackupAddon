@@ -1,0 +1,32 @@
+---
+configuration:
+  client_id:
+    name: client_id
+    description: ClientId API ЯндексДиска
+  client_secret:
+    name: client_secret
+    description: Секрет клиента API ЯндексДиска
+  remote_path:
+    name: remote_path
+    description: Каталог на ЯндексДиске в который переносятся архивные копии
+  remote_maximum_files_quantity:
+    name: remote_maximum_files_quantity
+    description: Максимальное количество копий на ЯндексДиске
+  schedule:
+    name: schedule
+    description: Расписание переноса копий (нотация cron)
+  upload_from_network_storage:
+    name: upload_from_network_storage
+    description: Разрешение копировать из сетевых хранилищ
+  enabled_network_storages:
+    name: enabled_network_storages
+    description: Сетевые хранилища, разрешённые к копированию (пусто = все)
+  log_level:
+    name: log_level
+    description: Уровень логирования
+  theme:
+    name: theme
+    description: Тема
+  entity_id:
+    name: entity_id
+    description: Идентификатор сущности, содержащей состояние
