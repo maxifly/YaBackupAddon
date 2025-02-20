@@ -1,4 +1,8 @@
 # Changelog
+## 2.01.3
+
+- Refusal to search for matching file name and slug.  [#28](https://github.com/maxifly/YaBackupAddon/issues/28)
+
 ## 2.01.2
 **Change config** (add configuration parameter. May be need full reinstall).
 

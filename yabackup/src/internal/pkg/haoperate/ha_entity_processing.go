@@ -330,6 +330,8 @@ func (haApi *HaApiClient) getJson(url string, result interface{}) error {
 		return resultError
 	}
 
+	//haApi.logger.DebugLog.Printf("*** Result body: %s", string(body))
+
 	// Декодируем JSON-ответ
 	if err := json.Unmarshal(body, result); err != nil {
 		resultError := fmt.Errorf("error when parse body: %v", err)
