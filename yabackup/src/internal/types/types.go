@@ -23,7 +23,6 @@ type GeneralFileInfo struct {
 }
 
 type NetworkFileInfo struct {
-	Slug     string
 	Location string
 }
 
@@ -90,6 +89,7 @@ type BackupArchInfo struct {
 type ForUploadFileInfo struct {
 	LocalFileInfo   GeneralFileInfo
 	NetworkFileInfo NetworkFileInfo
+	Slug            string
 	RemoteFileName  string
 	IsLocal         bool
 	IsNetwork       bool

@@ -34,12 +34,26 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 
 	for _, file := range files {
 
+		// TODO ОТказ от прямой загрузки файла. Пока непонятно как поставить файл в соответвие slug
+		//if file.IsLocal && file.LocalFileInfo.Name != "" {
+		//	sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
+		//	app.logger.DebugLog.Printf("Try upload %s ", sourceName)
+		//	err := app.YaDProcessor.UploadFile(sourceName, file.RemoteFileName)
+		//	if err != nil {
+		//		app.logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
+		//		isError = true
+		//		errorUploaded++
+		//	} else {
+		//		uploaded++
+		//		processedSize += file.LocalFileInfo.Size
+		//	}
+		//} else
+
 		if file.IsLocal {
-			sourceName := BACKUP_PATH + "/" + file.LocalFileInfo.Name
-			app.logger.DebugLog.Printf("Try upload %s ", sourceName)
-			err := app.YaDProcessor.UploadFile(sourceName, file.RemoteFileName)
+			app.logger.DebugLog.Printf("Try upload local file %s ", file.Slug)
+			err := app.YaDProcessor.UploadDataFromSlug(app.haApi, file.Slug, file.RemoteFileName)
 			if err != nil {
-				app.logger.ErrorLog.Printf("Error when upload file %s. Err: %s", sourceName, err)
+				app.logger.ErrorLog.Printf("Error when upload local file %s. Err: %s", file.Slug, err)
 				isError = true
 				errorUploaded++
 			} else {
@@ -47,10 +61,10 @@ func UploadFiles(app *BkProcessor, files []types.ForUploadFileInfo) (ProcessedFi
 				processedSize += file.LocalFileInfo.Size
 			}
 		} else if file.IsNetwork {
-			app.logger.DebugLog.Printf("Try upload network file %s ", file.NetworkFileInfo.Slug)
-			err := app.YaDProcessor.UploadDataFromSlug(app.haApi, file.NetworkFileInfo.Slug, file.RemoteFileName)
+			app.logger.DebugLog.Printf("Try upload network file %s ", file.Slug)
+			err := app.YaDProcessor.UploadDataFromSlug(app.haApi, file.Slug, file.RemoteFileName)
 			if err != nil {
-				app.logger.ErrorLog.Printf("Error when upload network file %s. Err: %s", file.NetworkFileInfo.Slug, err)
+				app.logger.ErrorLog.Printf("Error when upload network file %s. Err: %s", file.Slug, err)
 				isError = true
 				errorUploaded++
 			} else {
@@ -183,11 +197,13 @@ func getLocalBackupFiles(haApi *haoperate.HaApiClient, logger *mylogger.Logger) 
 		filePath := ""
 
 		if isLocal {
+			logger.DebugLog.Printf("Find file with slug %s", information.Slug)
 			fileName, err = findFile(&fileNames, information.Slug)
 			if err != nil {
-				return nil, err
+				logger.DebugLog.Printf("Local file name not found.")
+			} else {
+				filePath = filepath.Join(BACKUP_PATH, fileName)
 			}
-			filePath = filepath.Join(BACKUP_PATH, fileName)
 		}
 
 		result[information.Slug] = types.LocalBackupFileInfo{
@@ -282,6 +298,8 @@ func getAllFileNames(logger *mylogger.Logger, path string) ([]string, error) {
 	for i, entry := range entries {
 		result[i] = entry.Name()
 	}
+	logger.DebugLog.Printf("Get %d local backup files", len(result))
+	logger.DebugLog.Printf("local files: %v", result)
 	return result, nil
 }
 

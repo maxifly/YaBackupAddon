@@ -46,10 +46,12 @@ func (bkp *BkProcessor) GetFilesInfo() ([]types.BackupFileInfo, error) {
 	bkp.logger.DebugLog.Printf("Token expiry %v", bkp.YaDProcessor.TokenInfo.Expiry)
 	remoteFiles, err := bkp.YaDProcessor.GetRemoteFiles()
 	if err != nil {
+		bkp.logger.ErrorLog.Printf("error get remote files: %s", err)
 		return make([]types.BackupFileInfo, 0), err
 	}
 	localFiles, err := getLocalBackupFiles(bkp.haApi, bkp.logger)
 	if err != nil {
+		bkp.logger.ErrorLog.Printf("error get local files: %s", err)
 		return make([]types.BackupFileInfo, 0), err
 	}
 
@@ -67,6 +69,7 @@ func (bkp *BkProcessor) ChooseFilesToUpload(files []types.BackupFileInfo) []type
 				result = append(result, types.ForUploadFileInfo{
 					LocalFileInfo:  file.GeneralInfo,
 					RemoteFileName: file.RemoteFileName,
+					Slug:           file.BackupSlug,
 					IsLocal:        true,
 					IsNetwork:      false,
 				})
@@ -76,9 +79,9 @@ func (bkp *BkProcessor) ChooseFilesToUpload(files []types.BackupFileInfo) []type
 					LocalFileInfo:  file.GeneralInfo,
 					RemoteFileName: file.RemoteFileName,
 					NetworkFileInfo: types.NetworkFileInfo{
-						Slug:     file.BackupSlug,
 						Location: file.Location,
 					},
+					Slug:      file.BackupSlug,
 					IsLocal:   false,
 					IsNetwork: true,
 				})
