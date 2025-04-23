@@ -7,14 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 	"ybg/internal/pkg/mylogger"
 	"ybg/internal/types"
 )
 
+const UPLOAD_TEMP_DIR = "bfiles"
 const (
 	CoreBaseURL         string = "http://supervisor/core/api"
 	AddonsBaseURL       string = "http://supervisor/addons"
@@ -23,6 +26,7 @@ const (
 	DefaultEntityId     string = "yandex_backup_state"
 	localEntityCopyPath string = "/data/entity-copy.json"
 	addonIconPath       string = "/app/yabackup/internal/pkg/rest/ui/static/appicons"
+	uploadBackup        string = "/new/upload"
 )
 
 type HaApiClient struct {
@@ -163,6 +167,12 @@ type BackupsSlugDataResponse struct {
 type HaBackupInformationResponse struct {
 	HaBackupInformation HaBackupInfo `json:"data"`
 }
+type StubData struct {
+	Data string `json:"data,omitempty"`
+}
+type StubResponse struct {
+	Data StubData `json:"data,omitempty"`
+}
 type HaBackupInfo struct {
 	Slug                string                      `json:"slug"`
 	Name                string                      `json:"name"`
@@ -203,7 +213,7 @@ func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
 	haApi.logger.DebugLog.Println("Get entity request")
 	url := fmt.Sprintf("%s/states/%s", CoreBaseURL, haApi.entity_id)
 	var sensor getEntityStateResponse
-	err := haApi.getJson(url, &sensor)
+	err := haApi.getRequest(url, &sensor)
 	if err != nil {
 		resultError := fmt.Errorf("error when get entity: %v", err)
 		return nil, resultError
@@ -251,7 +261,7 @@ func (haApi *HaApiClient) GetAddonList() (*Addons, error) {
 	haApi.logger.DebugLog.Println("Get addons request")
 	url := fmt.Sprintf("%s", AddonsBaseURL)
 	var addonsList getAddonsResult
-	err := haApi.getJson(url, &addonsList)
+	err := haApi.getRequest(url, &addonsList)
 	if err != nil {
 		resultError := fmt.Errorf("error when get addons: %v", err)
 		return nil, resultError
@@ -265,7 +275,7 @@ func (haApi *HaApiClient) GetBackupSlugsList() (*BackupsSlugResponse, error) {
 	url := fmt.Sprintf("%s", BackupBaseURL)
 	var result BackupsSlugDataResponse
 
-	err := haApi.getJson(url, &result)
+	err := haApi.getRequest(url, &result)
 
 	if err != nil {
 		resultError := fmt.Errorf("error when get backups: %v", err)
@@ -280,7 +290,7 @@ func (haApi *HaApiClient) GetBackupInformation(slug string) (*HaBackupInfo, erro
 	url := fmt.Sprintf("%s/%s/info", BackupBaseURL, slug)
 	var result HaBackupInformationResponse
 
-	err := haApi.getJson(url, &result)
+	err := haApi.getRequest(url, &result)
 
 	if err != nil {
 		resultError := fmt.Errorf("error when get backups: %v", err)
@@ -290,11 +300,89 @@ func (haApi *HaApiClient) GetBackupInformation(slug string) (*HaBackupInfo, erro
 	return &result.HaBackupInformation, nil
 }
 
-func (haApi *HaApiClient) getJson(url string, result interface{}) error {
+func (haApi *HaApiClient) DeleteBackup(slug string) error {
+	haApi.logger.DebugLog.Println("Delete backup request")
+	url := fmt.Sprintf("%s/%s", BackupBaseURL, slug)
+	var result StubResponse
+
+	err := haApi.deleteRequest(url, &result)
+
+	if err != nil {
+		resultError := fmt.Errorf("error when delete backup: %v", err)
+		return resultError
+	}
+
+	return nil
+}
+
+func GetTemporaryFilePath(fileName string) string {
+	return UPLOAD_TEMP_DIR + "/" + fileName
+}
+
+func (haApi *HaApiClient) RemoveTemporaryFile(fileName string) {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		// Файл не существует, это не ошибка
+		haApi.logger.DebugLog.Printf("File %s does not exist, nothing to delete.", fileName)
+		return
+	} else if err != nil {
+		haApi.logger.ErrorLog.Printf("Error when delete file %s.", fileName)
+	}
+
+	// Удаляем файл
+	if err := os.Remove(fileName); err != nil {
+		haApi.logger.ErrorLog.Printf("Error when delete file %s.", fileName)
+		return
+	}
+
+	haApi.logger.DebugLog.Printf("File %s deleted successfully.", fileName)
+	return
+}
+
+func (haApi *HaApiClient) DeleteOldTemporaryFiles(days int) error {
+	threshold := time.Now().AddDate(0, 0, -days)
+
+	err := filepath.Walk(UPLOAD_TEMP_DIR, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			// Если это директория, пропускаем
+			return nil
+		}
+
+		if info.ModTime().Before(threshold) {
+			haApi.logger.DebugLog.Printf("Deleting file: %s\n", path)
+			if err := os.Remove(path); err != nil {
+				haApi.logger.ErrorLog.Printf("Error when delete file %s.", path)
+				return fmt.Errorf("error when delete file %s", path)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error when get directory info %s.", err)
+		return fmt.Errorf("error when get directory info %s", err)
+	}
+
+	return nil
+}
+
+func (haApi *HaApiClient) deleteRequest(url string, result interface{}) error {
+	return haApi.innerRequest("DELETE", url, http.StatusOK, result)
+}
+
+func (haApi *HaApiClient) getRequest(url string, result interface{}) error {
+	return haApi.innerRequest("GET", url, http.StatusOK, result)
+}
+
+func (haApi *HaApiClient) innerRequest(method string, url string, expectedStatus int, result interface{}) error {
 	haApi.logger.DebugLog.Printf("Execute get request %s", url)
 
 	// Создаем новый HTTP-запрос
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		resultError := fmt.Errorf("error when create request: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
@@ -316,7 +404,7 @@ func (haApi *HaApiClient) getJson(url string, result interface{}) error {
 	defer resp.Body.Close()
 
 	// Проверяем статус код
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != expectedStatus {
 		resultError := fmt.Errorf("failed to fetch data: %s", resp.Status)
 		haApi.logger.ErrorLog.Println(resultError)
 		return resultError
@@ -381,31 +469,6 @@ func (haApi *HaApiClient) GetDownloadBackupBody(slug string) (int64, io.ReadClos
 	}
 
 	return contentLength, resp.Body, nil
-
-	//// Проверяем статус код
-	//if resp.StatusCode != http.StatusOK {
-	//	resultError := fmt.Errorf("failed to fetch data: %s", resp.Status)
-	//	haApi.logger.ErrorLog.Println(resultError)
-	//	return 123, resultError
-	//}
-	//
-	//// Читаем тело ответа
-	//body, err := io.ReadAll(resp.Body)
-	//if err != nil {
-	//	resultError := fmt.Errorf("error when read body: %v", err)
-	//	haApi.logger.ErrorLog.Println(resultError)
-	//	return 123, resultError
-	//}
-	//
-	//// Декодируем JSON-ответ
-	//var addonsList getAddonsResult
-	//if err := json.Unmarshal(body, &addonsList); err != nil {
-	//	resultError := fmt.Errorf("error when parse body: %v", err)
-	//	haApi.logger.ErrorLog.Println(resultError)
-	//	return 123, resultError
-	//}
-	//haApi.logger.DebugLog.Printf("Get addons result %v", addonsList)
-	//return 124, nil
 }
 
 func (haApi *HaApiClient) SaveAddonIcon(slug string) (string, error) {
@@ -567,4 +630,96 @@ func readLocalEntityCopy() (setEntityStateRequest, error) {
 	var data setEntityStateRequest
 	err := json.Unmarshal(plan, &data)
 	return data, err
+}
+
+func (app *HaApiClient) UploadBackup(source string, destinationFileName string) error {
+	app.logger.DebugLog.Printf("Try upload %s into %s", source, destinationFileName)
+
+	url := fmt.Sprintf("%s/new/upload", BackupBaseURL)
+	return app.uploadFileMultipart(url, source, app.token)
+}
+
+func (app *HaApiClient) uploadFileMultipart(url, filePath, token string) error {
+	// Открываем файл для чтения
+	file, err := os.Open(filePath)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when open file: %v", err)
+		return fmt.Errorf("error when open file: %v", err)
+	}
+	defer file.Close()
+
+	// Создаем буфер для тела запроса
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Создаем часть для файла
+	part, err := writer.CreateFormFile("file", filePath)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when create form: %v", err)
+		return fmt.Errorf("error when create form: %v", err)
+	}
+
+	// Читаем файл по частям и записываем в часть формы
+	buf := make([]byte, 8192) // Буфер размером 8KB
+	for {
+		n, err := file.Read(buf)
+		if n > 0 {
+			_, err := part.Write(buf[:n])
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error when write part to form: %v", err)
+				return fmt.Errorf("error when write part to form: %v", err)
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			app.logger.ErrorLog.Printf("Error when read part from file: %v", err)
+			return fmt.Errorf("error when read part from file: %v", err)
+		}
+	}
+
+	// Закрываем писатель, чтобы завершить формирование тела запроса
+	err = writer.Close()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when close writer: %v", err)
+		return fmt.Errorf("error when close writer: %v", err)
+	}
+
+	// Создаем новый запрос
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when create request: %v", err)
+		return fmt.Errorf("error when create request: %v", err)
+	}
+
+	// Устанавливаем заголовки
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	// Создаем HTTP-клиент
+	client := &http.Client{}
+
+	// Выполняем запрос
+	resp, err := client.Do(req)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when execute request: %v", err)
+		return fmt.Errorf("error when execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Проверяем статус код
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		// Читаем тело ответа для получения сообщения об ошибке
+		responseBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			app.logger.ErrorLog.Printf("Error when read response: %v", err)
+			return fmt.Errorf("error when read response: %v", err)
+		}
+		app.logger.ErrorLog.Printf("Unexpected status: %s, response: %v", resp.Status, string(responseBody))
+		return fmt.Errorf("unexpected status: %s, response: %v", resp.Status, string(responseBody))
+	}
+
+	app.logger.InfoLog.Printf("File uploaded: %s", filePath)
+	return nil
 }

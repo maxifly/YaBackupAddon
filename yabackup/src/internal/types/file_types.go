@@ -8,6 +8,7 @@ import (
 
 const MiB = float64(1 << 20)
 const PUT = "PUT"
+const POST = "POST"
 
 var currentLocation *time.Location = time.Now().Location()
 
