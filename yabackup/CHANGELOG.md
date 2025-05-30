@@ -1,4 +1,10 @@
 # Changelog
+## 2.01.4
+
+- Add NAS name to modal window.  [#26](https://github.com/maxifly/YaBackupAddon/issues/26)
+- Add delete operation
+- Add upload to HA operation
+
 ## 2.01.3
 
 - Refusal to search for matching file name and slug.  [#28](https://github.com/maxifly/YaBackupAddon/issues/28)

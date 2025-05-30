@@ -17,6 +17,8 @@ WORKDIR /app
 COPY app/ .
 
 WORKDIR /app/yabackup
+WORKDIR /app/yabackup/bfiles
+WORKDIR /app/yabackup
 
 COPY src/ .
 

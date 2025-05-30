@@ -206,22 +206,34 @@ func getLocalBackupFiles(haApi *haoperate.HaApiClient, logger *mylogger.Logger) 
 			}
 		}
 
+		locations := filterEmptyStrings(&information.Locations)
+		sort.Strings(locations)
+		locationsConcat := strings.Join(locations, ",")
 		result[information.Slug] = types.LocalBackupFileInfo{
 			GeneralInfo:    convertHaBackupInfoToGeneral(information, fileName),
 			BackupArchInfo: convertHaBackupInfoToBackupArchInfo(information),
 			BackupSlug:     information.Slug,
 			BackupName:     information.Name,
 			IsProtected:    information.Protected,
-			IsNetwork:      !isLocal || hasNonEmptyElement(&information.Locations),
+			IsNetwork:      !isLocal || hasNonEmptyElement(&locations),
 			IsLocal:        isLocal,
 			Path:           filePath,
-			Location:       strings.TrimSpace(information.Location),
+			Location:       locationsConcat,
 		}
 
 	}
 
 	return result, nil
 
+}
+func filterEmptyStrings(arr *[]string) []string {
+	var filtered []string
+	for _, str := range *arr {
+		if strings.TrimSpace(str) != "" {
+			filtered = append(filtered, str)
+		}
+	}
+	return filtered
 }
 
 func hasNonEmptyElement(arr *[]string) bool {

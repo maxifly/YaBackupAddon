@@ -1,3 +1,5 @@
+github.com/cavaliergopher/grab/v3 v3.0.1 h1:4z7TkBfmPjmLAAmkkAZNX/6QJ1nNFdv3SdIHXju0Fr4=
+github.com/cavaliergopher/grab/v3 v3.0.1/go.mod h1:1U/KNnD+Ft6JJiYoYBAimKH2XrYptb8Kl3DFGmsjpq4=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -20,8 +22,8 @@ github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
-github.com/maxifly/upload-big-file v1.0.4 h1:5yvVZK8z04Bnp0urNDZR6N9UM2lYrqCrngL/DmFDI6M=
-github.com/maxifly/upload-big-file v1.0.4/go.mod h1:25HoF1GOzA9/N4VWrquWYtxX3yzLgDptxpOPO4D/xys=
+github.com/maxifly/upload-big-file v1.0.5 h1:G3vIy10jUKtyNQ/S0tQ3eey+gEwU3ce0h29ZAyCZGRg=
+github.com/maxifly/upload-big-file v1.0.5/go.mod h1:25HoF1GOzA9/N4VWrquWYtxX3yzLgDptxpOPO4D/xys=
 github.com/maxifly/yandex-disk-sdkgo v1.0.4 h1:nWctUC7r28y2lJHdbLUgdbT8zczNF3ItCjWZk7I9J30=
 github.com/maxifly/yandex-disk-sdkgo v1.0.4/go.mod h1:QfOCihjDA/i6oH9vMub0B5SZwSgmYYTXnNuE7ziMqmA=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=

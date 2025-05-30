@@ -12,6 +12,7 @@ import (
 	"ybg/internal/pkg/bkoperate"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
+	om "ybg/internal/pkg/operationmanager"
 	"ybg/internal/pkg/rest"
 	"ybg/internal/pkg/yadiskoperate"
 )
@@ -19,11 +20,15 @@ import (
 const FILE_PATH_OPTIONS = "/data/options.json"
 const restoreStateEntityInterval time.Duration = 1800
 const restoreStateEntitySchedule = "*/30 * * * * *"
+const clearTaskSchedule = "0 0 */6 * * *"
+const operationHourDelta = 6
+const oldTemporaryFileDayDelta = 6
 
 type YbgApp struct {
 	options          ApplOptions
 	restObj          *rest.Rest
 	haApi            *haoperate.HaApiClient
+	operationManager *om.OperationManager
 	logger           *mylogger.Logger
 	scheduleLogLevel gocron.LogLevel
 	scheduler        gocron.Scheduler
@@ -52,6 +57,7 @@ func NewYbg(port string) *YbgApp {
 	debugLog := log.New(mylogger.NewNullWriter(), "DEBUG\t", logFormat)
 	infoLog := log.New(mylogger.NewNullWriter(), "INFO\t", logFormat)
 	errorLog := log.New(os.Stderr, "ERROR\t", logFormat)
+	isDebudDisable := true
 
 	scheduleLogLevel := gocron.LogLevelWarn
 
@@ -66,6 +72,7 @@ func NewYbg(port string) *YbgApp {
 		debugLog = log.New(os.Stdout, "DEBUG\t", logFormat)
 		infoLog = log.New(os.Stdout, "INFO\t", logFormat)
 		scheduleLogLevel = gocron.LogLevelDebug
+		isDebudDisable = false
 
 	}
 	if options.LogLevel == "INFO" {
@@ -78,17 +85,20 @@ func NewYbg(port string) *YbgApp {
 	errorLog.Println("hello")
 
 	// Инициализируем новую структуру с зависимостями приложения.
-	logger := mylogger.Logger{ErrorLog: errorLog,
-		InfoLog:  infoLog,
-		DebugLog: debugLog}
+	logger := mylogger.New(errorLog, infoLog, debugLog)
+	if isDebudDisable {
+		logger.DisableDebug()
+	}
 
-	haApi, err := createHaApiClient(&logger, options.EntityId)
+	operationManager := om.New(logger)
+
+	haApi, err := createHaApiClient(logger, options.EntityId)
 	if err != nil {
 		logger.ErrorLog.Printf("Error create HaApiClient %v", err)
 		//panic(fmt.Sprintf("error create HaApiClient %v", err))
 	}
 
-	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, &logger)
+	yaDP := yadiskoperate.NewYaDProcessor(options.ClientId, options.ClientSecret, options.RemotePath, operationManager, logger)
 
 	enabledNetworkStorages := make([]string, len(options.EnabledNetworkStorages))
 
@@ -96,14 +106,14 @@ func NewYbg(port string) *YbgApp {
 		enabledNetworkStorages[i] = element.Name
 	}
 
-	bkP := bkoperate.NewBkProcessor(yaDP, haApi, options.RemoteMaximumFilesQuantity, options.EnableUploadFromNetworkStorage, enabledNetworkStorages, &logger)
+	bkP := bkoperate.NewBkProcessor(yaDP, haApi, options.RemoteMaximumFilesQuantity, options.EnableUploadFromNetworkStorage, enabledNetworkStorages, logger)
 
 	yaDP.EnsureTokenInfo()
 	yaDP.RefreshTokenIsNeed()
 	yaDP.EnsureYandexDisk()
 
 	// Создаем рест
-	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, &logger)
+	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, operationManager, logger)
 	if err != nil {
 		logger.ErrorLog.Printf("Error create Rest %v", err)
 		panic(fmt.Sprintf("error create Rest %v", err))
@@ -112,9 +122,10 @@ func NewYbg(port string) *YbgApp {
 	return &YbgApp{
 		options:          options,
 		scheduleLogLevel: scheduleLogLevel,
-		logger:           &logger,
+		logger:           logger,
 		restObj:          restObj,
-		haApi:            haApi}
+		haApi:            haApi,
+		operationManager: operationManager}
 }
 
 func (app *YbgApp) Start() {
@@ -124,6 +135,8 @@ func (app *YbgApp) Start() {
 			gocron.NewLogger(app.scheduleLogLevel),
 		))
 	app.scheduler = scheduler
+
+	// Upload backup task
 
 	_, err = app.scheduler.NewJob(
 		gocron.CronJob(
@@ -141,6 +154,7 @@ func (app *YbgApp) Start() {
 	}
 	app.logger.InfoLog.Printf("Add upload job for to %s schedule", app.options.Schedule)
 
+	// Restore HA entitystate task
 	_, err = app.scheduler.NewJob(
 		gocron.CronJob(
 			// standard cron tab parsing
@@ -162,11 +176,38 @@ func (app *YbgApp) Start() {
 	}
 	app.logger.InfoLog.Printf("Add restore state entity job for to %s schedule (cron with seconds!!!)", restoreStateEntitySchedule)
 
+	// Clear task
+	_, err = app.scheduler.NewJob(
+		gocron.CronJob(
+			// standard cron tab parsing
+			clearTaskSchedule,
+			true,
+		),
+		gocron.NewTask(
+			func() {
+				err := app.operationManager.ClearOperations(operationHourDelta)
+				if err != nil {
+					app.logger.ErrorLog.Printf("Error when clear operation. %v", err)
+				}
+				err = app.haApi.DeleteOldTemporaryFiles(oldTemporaryFileDayDelta)
+				if err != nil {
+					app.logger.ErrorLog.Printf("Error when delete old temporary files %s", err)
+				}
+			},
+		),
+	)
+
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when create restore state entity task job. %v", err)
+	}
+	app.logger.InfoLog.Printf("Add restore state entity job for to %s schedule (cron with seconds!!!)", restoreStateEntitySchedule)
+
 	// Запуск планировщика в отдельной горутине
 	go func() {
 		app.scheduler.Start()
 	}()
 
+	// Запуск восстановления EntityState
 	restoreEntityTask := func() bool {
 		err := app.haApi.EnsureEntityState()
 		if err != nil {

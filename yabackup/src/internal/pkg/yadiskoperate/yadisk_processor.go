@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"ybg/internal/pkg/downloader"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
+	om "ybg/internal/pkg/operationmanager"
 	"ybg/internal/types"
 )
 
@@ -18,17 +20,20 @@ type YaDProcessor struct {
 	remotePath   string
 	TokenInfo    types.TokenInfo
 	yaDisk       *yadisk.YaDisk
+	downloader   *downloader.Downloader
 	logger       *mylogger.Logger
 }
 
 func NewYaDProcessor(clientId string,
 	clientSecret string,
 	remotePath string,
+	operationManager *om.OperationManager,
 	logger *mylogger.Logger) *YaDProcessor {
 	return &YaDProcessor{
 		clientId:     clientId,
 		clientSecret: clientSecret,
 		remotePath:   remotePath,
+		downloader:   downloader.New(operationManager, logger),
 		logger:       logger,
 	}
 }
@@ -146,6 +151,27 @@ func (app *YaDProcessor) GetRemoteFiles() ([]types.RemoteFileInfo, error) {
 	return result, nil
 
 }
+
+func (app *YaDProcessor) DownloadFile(sourceFileName, destination, id string) error {
+	source := app.remotePath + "/" + sourceFileName
+	app.logger.DebugLog.Printf("Download file: %s to %s", source, destination)
+
+	link, err := (*app.yaDisk).GetResourceDownloadLink(source, nil)
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when get download link for file: %w", err)
+		return fmt.Errorf("error when get download link for file: %w", err)
+	}
+
+	err = app.downloader.Download(link.Href, destination, id, "from YD")
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when download file: %w", err)
+		return fmt.Errorf("error when download file: %w", err)
+	}
+	app.logger.DebugLog.Printf("File: %s downloaded to %s", source, destination)
+	return nil
+
+}
+
 func (app *YaDProcessor) UploadFile(source string, destinationFileName string) error {
 	return app.innerUpload(source, nil, 0, destinationFileName)
 }
@@ -194,9 +220,9 @@ func (app *YaDProcessor) innerUpload(source string, reader *io.Reader, size int6
 
 	switch {
 	case source != "":
-		uploader = uploadbig.NewUploaderFromFile(types.PUT, link.Href, source, httpClient, int(types.MiB), &logger)
+		uploader = uploadbig.NewUploaderFromFile(types.PUT, link.Href, source, nil, httpClient, int(types.MiB), &logger)
 	case reader != nil:
-		uploader = uploadbig.NewUploaderFromReader(types.PUT, link.Href, reader, size, httpClient, int(types.MiB), &logger)
+		uploader = uploadbig.NewUploaderFromReader(types.PUT, link.Href, reader, size, nil, httpClient, int(types.MiB), &logger)
 	default:
 		return fmt.Errorf("unsupported upload source")
 	}

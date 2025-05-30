@@ -1,6 +1,24 @@
 {{template "base" .}}
 {{define "title"}}<h1>Backups</h1>{{end}}
 {{define "scripts"}}
+<!-- Модальное окно окнчания операции-->
+<div class="modal fade" id="completionModal" tabindex="-1" aria-labelledby="completionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+<!--            <div class="modal-header">-->
+<!--                <h5 class="modal-title" id="completionModalLabel">Операция закончена</h5>-->
+<!--                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>-->
+<!--            </div>-->
+            <div class="modal-body" id="completionMessage">
+                <!-- Динамический текст будет вставлен сюда -->
+            </div>
+            <div class="modal-footer">
+                <button id="completionModalOkButton" type="button" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Модальное окно -->
 <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -9,7 +27,10 @@
                 <h5 class="modal-title"><span id="backupName"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+
             <div class="modal-body">
+                <input type="text" id="remoteFileName" value="" hidden>
+                <input type="text" id="backupSlug" value="" hidden>
                 <div class="row">
                     <div class="col-md-6">
                         <p><img class="icon backuptype me-2"><span id="backupType"></span></p>
@@ -44,20 +65,31 @@
                 </div>
 
                 <div class="container px-2">
-                    <div id="presentInLocal" class="row" style="display: none;">
+                    <div id="presentInHA" class="row" style="display: none;">
                         <div class="col-12 my-2">
                             <div class="row">
                                 <div class="col-md-12 p-4 border border-secondary border-2 rounded-1">
-                                    <div class="row">
+                                    <div id="presentInLocal" class="row" style="display: none;">
                                         <div class="col-md-4">
                                                 <img class="icon database"> Local
                                         </div>
-    <!--                                    <div class="col-md-8">-->
-    <!--                                            <button id="homeDeleteButton" class="btn btn-danger" onclick="confirmDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Удалить</button>-->
-    <!--                                            <button id="homeYesButton" class="btn btn-success" style="display:none;" onclick="deleteCard()">Да</button>-->
-    <!--                                            <button id="homeNoButton" class="btn btn-secondary" style="display:none;" onclick="cancelDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Нет-->
-    <!--                                            </button>-->
-    <!--                                    </div>-->
+                                    </div>
+                                    <div id="presentInNetwork" class="row" style="display: none;">
+                                        <div class="col-md-12">
+                                                <img class="icon nas"> NAS
+
+                                                <span id="backupLocation"></span>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+
+                                        </div>
+                                        <div class="col-md-8">
+                                            <button id="LocalDeleteMainButton" class="btn btn-danger" onclick="confirmOperation('LocalDeleteMainButton', 'LocalDeleteYesButton', 'LocalDeleteNoButton')">Delete</button>
+                                            <button id="LocalDeleteYesButton" class="btn btn-success" style="display:none;">Yes</button>
+                                            <button id="LocalDeleteNoButton" class="btn btn-secondary" style="display:none;" onclick="cancelOperation('LocalDeleteMainButton', 'LocalDeleteYesButton', 'LocalDeleteNoButton')">No</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -71,18 +103,41 @@
                                         <div class="col-md-4">
                                                 <img class="icon cloud"> Yandex Disk
                                         </div>
-    <!--                                    <div class="col-md-8">-->
-    <!--                                            <button id="homeDeleteButton" class="btn btn-danger" onclick="confirmDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Удалить</button>-->
-    <!--                                            <button id="homeYesButton" class="btn btn-success" style="display:none;" onclick="deleteCard()">Да</button>-->
-    <!--                                            <button id="homeNoButton" class="btn btn-secondary" style="display:none;" onclick="cancelDelete('homeDeleteButton', 'homeYesButton', 'homeNoButton')">Нет-->
-    <!--                                            </button>-->
-    <!--                                    </div>-->
+                                        <div class="col-md-8">
+                                            <button id="YdDeleteMainButton" class="btn btn-danger" onclick="confirmOperation('YdDeleteMainButton', 'YdDeleteYesButton', 'YdDeleteNoButton')">Delete</button>
+                                            <button id="YdDeleteYesButton" class="btn btn-success" style="display:none;">Yes</button>
+                                            <button id="YdDeleteNoButton" class="btn btn-secondary" style="display:none;" onclick="cancelOperation('YdDeleteMainButton', 'YdDeleteYesButton', 'YdDeleteNoButton')">No</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <div id="uploadToLocal" class="row" style="display: none;">
+                        <div class="col-12 my-2">
+                            <div class="row">
+                                <div class="col-md-12 p-4 border border-secondary border-2 rounded-1">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                                Upload to local storage
+                                        </div>
+                                        <div class="col-md-8">
+                                                <button id="homeLoadToHaMainButton" class="btn btn-danger" onclick="confirmOperation('homeLoadToHaMainButton', 'homeLoadToHaYesButton', 'homeLoadToHaNoButton')">Upload to local storage</button>
+                                                <button id="homeLoadToHaYesButton" class="btn btn-success" style="display:none;">Yes</button>
+                                                <button id="homeLoadToHaNoButton" class="btn btn-secondary" style="display:none;" onclick="cancelOperation('homeLoadToHaMainButton', 'homeLoadToHaYesButton', 'homeLoadToHaNoButton')">No
+                                                </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="progress" class="row">
+                    </div>
                 </div>
+
+
 
                 <div class="my-3">
                   <h6>Contains:</h6>
@@ -112,6 +167,8 @@
 
      data-backupslug="{{ .BackupSlug }}"
      data-backupname="{{ .BackupName }}"
+     data-remotefilename="{{ .RemoteFileName }}"
+     data-location="{{ .Location }}"
      data-backuptype=
 {{if eq .BackupArchInfo.BackupType "full"}}
 "Full backup"
@@ -177,12 +234,21 @@ data-isLocal =
 {{else}}
 0
 {{end}}
+
+data-isNetwork =
+{{if .IsNetwork }}
+1
+{{else}}
+0
+{{end}}
 >
 
 
 <h4 class="card-title pb-2">{{ .BackupName }}</h4>
 <h5 class="card-subtitle">{{ .GeneralInfo.Created.Convert2String }}</h5>
 <p class="card-text">{{ .GeneralInfo.Size.Convert2MbString }} MB</p>
+
+<div id="op_progress{{ .RemoteFileName }}" class="text" > </div>
 <div class="d-flex justify-content-start">
     {{if .IsLocal}}
     <img class="icon database">
@@ -229,6 +295,8 @@ data-isLocal =
             // Получаем данные из атрибутов карточки
             const backupSlug = this.getAttribute('data-backupslug');
             const backupName = this.getAttribute('data-backupname');
+            const remoteFileName = this.getAttribute('data-remotefilename');
+            const backupLocation = this.getAttribute('data-location');
             const backupType = this.getAttribute('data-backuptype');
             const backupSize = this.getAttribute('data-backupsize');
             const createdTime = this.getAttribute('data-createdtime');
@@ -238,6 +306,7 @@ data-isLocal =
             const isShowUploadedTime = this.getAttribute('data-isShowUploadedTime');
 
             const isLocal = this.getAttribute('data-isLocal');
+            const isNetwork = this.getAttribute('data-isNetwork');
             const isRemote = this.getAttribute('data-isRemote');
 
             const addonsData = JSON.parse(this.getAttribute('data-addons'));
@@ -245,10 +314,13 @@ data-isLocal =
             const coreData = JSON.parse(this.getAttribute('data-core'));
 
             document.getElementById('backupName').innerText = backupName;
+            document.getElementById('remoteFileName').innerText = remoteFileName;
+            document.getElementById('backupSlug').innerText = backupSlug;
             document.getElementById('backupType').innerText = backupType;
             document.getElementById('backupSize').innerText = backupSize;
             document.getElementById('backupCreated').innerText = createdTime;
             document.getElementById('backupUploaded').innerText = uploadedTime;
+            document.getElementById('backupLocation').innerText = backupLocation;
             document.getElementById('coreVersion').innerText = coreData.version;
             document.getElementById('errorMessage').style.display = 'none';
 
@@ -277,17 +349,44 @@ data-isLocal =
                 document.getElementById('backupUploadedSection').style.display = 'none';
             }
 
+            if (isLocal == 1 || isNetwork == 1) {
+                document.getElementById('presentInHA').style.display = 'block';
+            } else {
+                document.getElementById('presentInHA').style.display = 'none';
+            }
+
             if (isLocal == 1) {
                 document.getElementById('presentInLocal').style.display = 'block';
             } else {
                 document.getElementById('presentInLocal').style.display = 'none';
             }
+
+            if (isNetwork == 1) {
+                document.getElementById('presentInNetwork').style.display = 'block';
+            } else {
+                document.getElementById('presentInNetwork').style.display = 'none';
+            }
+
+
             if (isRemote == 1) {
                 document.getElementById('presentInCloud').style.display = 'block';
             } else {
                 document.getElementById('presentInCloud').style.display = 'none';
             }
+            if (isRemote == 1 && isLocal == 0) {
+                document.getElementById('uploadToLocal').style.display = 'block';
+            } else {
+                document.getElementById('uploadToLocal').style.display = 'none';
+            }
 
+            const progressContainer = document.getElementById('progress');
+            progressContainer.innerHTML = ''; // Очищаем предыдущие данные
+            const progressCol = document.createElement('div');
+            progressCol.className = 'col-md-12';
+            progressCol.innerHTML = `
+               <div id="op_modal_progress` + remoteFileName +`" class="text" > </div>
+            `;
+            progressContainer.appendChild(progressCol);
 
             const foldersContainer = document.getElementById('folders');
             foldersContainer.innerHTML = ''; // Очищаем предыдущие данные
@@ -360,26 +459,43 @@ data-isLocal =
                 }
             });
 
-            // Сброс состояния модального окна
-            document.getElementById('deleteButton').disabled = false;
-            document.getElementById('yesButton').style.display = 'none';
-            document.getElementById('noButton').style.display = 'none';
-            document.getElementById('errorMessage').style.display = 'none';
-
             currentBackupSlug = backupSlug;
         })
     });
 
-    function confirmDelete(deleteButton, yesButton, noButton) {
-        document.getElementById(deleteButton).disabled = true;
+    var myModal = document.getElementById('exampleModal');
+    myModal.addEventListener('shown.bs.modal', function () {
+        document.getElementById('errorMessage').style.display = 'none';
+        initialButtons('homeLoadToHa')
+        initialButtons('YdDelete')
+    });
+    myModal.addEventListener('hidden.bs.modal', function () {
+        document.getElementById('errorMessage').style.display = 'none';
+        initialButtons('homeLoadToHa')
+        initialButtons('YdDelete')
+    });
+
+    function initialButtons(prefix) {
+        document.getElementById(prefix + 'MainButton').disabled = false;
+        document.getElementById(prefix + 'YesButton').style.display = 'none';
+        document.getElementById(prefix + 'NoButton').style.display = 'none';
+    }
+
+    function confirmOperation(mainButton, yesButton, noButton) {
+        document.getElementById(mainButton).disabled = true;
         document.getElementById(yesButton).style.display = 'inline-block';
         document.getElementById(noButton).style.display = 'inline-block';
     }
 
-    function cancelDelete(deleteButton, yesButton, noButton) {
-        document.getElementById(deleteButton).disabled = false;
+    function cancelOperation(mainButton, yesButton, noButton) {
+        document.getElementById(mainButton).disabled = false;
         document.getElementById(yesButton).style.display = 'none';
         document.getElementById(noButton).style.display = 'none';
+    }
+
+    function hideYesNoButtons(prefix) {
+        document.getElementById(prefix + 'YesButton').style.display = 'none';
+        document.getElementById(prefix + 'NoButton').style.display = 'none';
     }
 
     function deleteCard() {
@@ -400,6 +516,150 @@ data-isLocal =
                 document.getElementById('yesButton').style.display = 'none';
                 document.getElementById('noButton').style.display = 'none';
             });
+    }
+
+    document.getElementById('homeLoadToHaYesButton').addEventListener('click', function() {
+        const fileName = document.getElementById('remoteFileName').innerText;
+        hideYesNoButtons('homeLoadToHa')
+        updateTextByPrefix('op_modal_progress', 'start upload 0%')
+        loadToHa(fileName, fileName);
+    });
+    document.getElementById('YdDeleteYesButton').addEventListener('click', function() {
+        const fileName = document.getElementById('remoteFileName').innerText;
+        hideYesNoButtons('YdDelete')
+        updateTextByPrefix('op_modal_progress', 'start delete from YD 0%')
+        deleteFromYd(fileName, fileName);
+    });
+    document.getElementById('LocalDeleteYesButton').addEventListener('click', function() {
+        const backupSlug = document.getElementById('backupSlug').innerText;
+        const fileName = document.getElementById('remoteFileName').innerText;
+        hideYesNoButtons('LocalDelete')
+        updateTextByPrefix('op_modal_progress', 'start delete from local 0%')
+        deleteFromLocal(backupSlug, fileName);
+    });
+
+    function hideModal(modalId) {
+        const modal = bootstrap.Modal.getInstance(document.getElementById(modalId));
+        modal.hide();
+    }
+
+    function deleteFromYd(fileName, operationId) {
+        const absoluteUrl = getAbsoluteUrl('delete-from-yd/' + fileName);
+        fetch(absoluteUrl, {method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'yba-operation-id': operationId
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    const currentPath = window.location.pathname
+                    console.log("response " + response.status)
+                    throw new Error('Delete from YD with error ' + currentPath + ' ' + absoluteUrl + ' ' + response.status + ' ' + response.text() );
+                }
+                // Успешное удаление
+                hideModal('exampleModal')
+                showCompletionModal('File deleted from YD');
+                // alert('File loaded');
+            })
+            .catch(error => {
+                console.log("error " + error)
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) {
+                    errorDiv.textContent = error.message; // Устанавливаем текст ошибки
+                    errorDiv.style.display = 'block'; // Отображаем блок с ошибкой
+                }
+                initialButtons('YdDelete')
+                hideModal('exampleModal')
+                showCompletionModal('Error when delete file from YD');
+            });
+    }
+
+    function deleteFromLocal(backupSlug, operationId) {
+        const absoluteUrl = getAbsoluteUrl('delete-from-ha/' + backupSlug);
+        fetch(absoluteUrl, {method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'yba-operation-id': operationId
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    const currentPath = window.location.pathname
+                    console.log("response " + response.status)
+                    throw new Error('Delete from HA with error ' + currentPath + ' ' + absoluteUrl + ' ' + response.status + ' ' + response.text() );
+                }
+                // Успешное удаление
+                hideModal('exampleModal')
+                showCompletionModal('File deleted from local');
+                // alert('File loaded');
+            })
+            .catch(error => {
+                console.log("error " + error)
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) {
+                    errorDiv.textContent = error.message; // Устанавливаем текст ошибки
+                    errorDiv.style.display = 'block'; // Отображаем блок с ошибкой
+                }
+                initialButtons('LocalDelete')
+                hideModal('exampleModal')
+                showCompletionModal('Error when delete file from local');
+            });
+    }
+
+    function loadToHa(fileName, operationId) {
+        // Выполняем REST-запрос
+        const absoluteUrl = getAbsoluteUrl('load-to-ha/' + fileName);
+
+        fetch(absoluteUrl, {method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                 'yba-operation-id': operationId
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    const currentPath = window.location.pathname;
+
+                    throw new Error('Load with error ' + currentPath + ' ' + absoluteUrl + ' ' + response.status + ' ' + response.text() );
+                }
+                // Успешная загрузка
+                hideModal('exampleModal')
+                showCompletionModal('File uploaded to HA');
+                // alert('File loaded');
+            })
+            .catch(error => {
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) {
+                    errorDiv.textContent = error.message; // Устанавливаем текст ошибки
+                    errorDiv.style.display = 'block'; // Отображаем блок с ошибкой
+                }
+                initialButtons('homeLoadToHa')
+                hideModal('exampleModal')
+                showCompletionModal('Error when upload file to HA');
+            });
+    }
+
+    function showCompletionModal(message) {
+        const completionModal = new bootstrap.Modal(document.getElementById('completionModal'));
+        const messageElement = document.getElementById('completionMessage');
+        if (messageElement) {
+            messageElement.textContent = message;
+        }
+        completionModal.show();
+    }
+
+    // Обработчик для кнопки OK
+    document.getElementById('completionModalOkButton').addEventListener('click', () => {
+        window.location.href = getAbsoluteUrl('index'); // Перенаправление на /index
+    });
+
+    function getAbsoluteUrl(relativePath) {
+        // Получаем базовый URL текущей страницы
+        const baseUrl = window.location.origin;
+        const currentPath = window.location.pathname;
+        // Создаем абсолютный URL
+        return new URL(relativePath, baseUrl+currentPath).href;
     }
 
     function getFolderName(slug) {
@@ -453,5 +713,70 @@ data-isLocal =
         icon = "static/appicons/" + icon
         return icon;
     }
+
+    function updateTextByPrefix(prefix, newText) {
+        const elements = document.querySelectorAll(`[id^="${prefix}"]`);
+        elements.forEach(element => {
+            element.innerText = newText;
+        });
+    }
+
+    function updateTextProgressField(entity, prefix) {
+        const fieldId = prefix + entity.id; // Формируем идентификатор элемента
+        const textField = document.getElementById(fieldId);
+
+        // console.log('FieldId:', fieldId);
+        // console.log('IsDone:', entity.is_done);
+
+        if (textField) {
+            if (!entity.is_done) {
+                // Вставляем текст из полей status и progress
+                textField.innerText = `${entity.status} ${entity.progress} %`;
+            } else {
+                // Очищаем поле, если is_done = true
+                textField.innerText = '';
+            }
+        }
+        // else {
+        //     console.log('Field "' + fieldId + '" not found');
+        // }
+    }
+
+    function updateProgressFields() {
+        const apiUrl = getAbsoluteUrl('operation/status/all');
+        // const apiUrl = 'https://your-api-endpoint.com/entities';
+
+        // Выполняем REST-запрос
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    // Если ответ не успешный, возвращаем пустой массив
+                    return [];
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Проверяем, является ли data массивом
+                if (!Array.isArray(data)) {
+                    data = [];
+                }
+
+                // Обходим каждую сущность и обновляем соответствующие поля
+                data.forEach(entity => {
+                    updateTextProgressField(entity, 'op_progress');
+                    updateTextProgressField(entity, 'op_modal_progress');
+                });
+            })
+            .catch(error => {
+                // Логируем ошибку, но не отображаем её пользователю
+                console.log('Fetch operation encountered an error:', error);
+            });
+    }
+
+    // Вызываем функцию один раз при загрузке страницы
+    updateProgressFields();
+
+    // Устанавливаем интервал для периодического вызова функции каждые 30 секунд
+    setInterval(updateProgressFields, 10000);
 </script>
 {{end}}
