@@ -22,10 +22,13 @@ type AlertMessage struct {
 	Message string
 }
 type BackupResponse struct {
-	IsDarkTheme   bool
-	AlertMessages []AlertMessage
-	BFiles        []types.BackupFileInfo
-	AddonIcons    map[string]string
+	IsDarkTheme      bool
+	AlertMessages    []AlertMessage
+	BFiles           []types.BackupFileInfo
+	YDStatistic      types.StorageStatistic
+	LocalStatistic   types.StorageStatistic
+	NetworkStatistic map[string]types.StorageStatistic
+	AddonIcons       map[string]string
 }
 type GetTokenResponse struct {
 	IsDarkTheme   bool
@@ -240,6 +243,20 @@ func (app *Rest) indexHandler(w http.ResponseWriter, r *http.Request) {
 		IsDarkTheme:   app.isUseDarkTheme(),
 		AddonIcons:    app.icons}
 
+	statistic, err := app.bKProcessor.GetStatistic()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error get yandex disc statistic %s", err)
+		data.YDStatistic = types.StorageStatistic{FileAmount: -1, FilesSize: 0, FreeSpace: 0}
+		data.LocalStatistic = types.StorageStatistic{FileAmount: -1, FilesSize: 0, FreeSpace: 0}
+		data.NetworkStatistic = make(map[string]types.StorageStatistic)
+	} else {
+		data.YDStatistic = statistic.YaDisk
+		data.LocalStatistic = statistic.LocalStorage
+		data.NetworkStatistic = statistic.NetworkStorage
+	}
+
+	//data.NetworkStatistic["server1"] = types.StorageStatistic{FilesSize: 1, FileAmount: 300, FreeSpace: 222}
+	//data.NetworkStatistic["server2"] = types.StorageStatistic{FilesSize: 2, FileAmount: 200, FreeSpace: 333}
 	err = ts.Execute(w, data)
 	if err != nil {
 		app.logger.ErrorLog.Println(err.Error())
@@ -422,6 +439,7 @@ func innerDeleteFileFromHa(app *Rest, slug, id string) error {
 		return err
 	}
 	app.operationManager.SuccessDone(id)
+	app.updateStatistic()
 	return nil
 }
 func innerDeleteFileFromYd(app *Rest, filename, id string) error {
@@ -436,6 +454,7 @@ func innerDeleteFileFromYd(app *Rest, filename, id string) error {
 		return err
 	}
 	app.operationManager.SuccessDone(id)
+	app.updateStatistic()
 	return nil
 }
 func innerUploadFile(app *Rest, filename, id string) {
@@ -466,6 +485,7 @@ func innerUploadFile(app *Rest, filename, id string) {
 	app.haApi.RemoveTemporaryFile(dst)
 
 	app.operationManager.SuccessDone(id)
+	app.updateStatistic()
 }
 
 func UploadTask(app *Rest) {
@@ -573,6 +593,9 @@ func UploadTask(app *Rest) {
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error save entity state %s", err)
 	}
+
+	app.updateStatistic()
+
 }
 
 func (app *Rest) downloadFile(w http.ResponseWriter, r *http.Request) {
@@ -584,4 +607,12 @@ func (app *Rest) downloadFile(w http.ResponseWriter, r *http.Request) {
 	app.logger.DebugLog.Printf("filename: %s", fileName)
 	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(fileName))
 	http.ServeFile(w, r, fileName)
+}
+
+func (app *Rest) updateStatistic() {
+	app.bKProcessor.InvalidateStatistic()
+	_, err := app.bKProcessor.UpdateStatistic()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error update statistic %s", err)
+	}
 }

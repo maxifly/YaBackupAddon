@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"ybg/internal/pkg/haoperate"
 	"ybg/internal/pkg/mylogger"
@@ -13,12 +14,21 @@ import (
 
 const BACKUP_PATH = "/backup"
 
+type Statistic struct {
+	YaDisk         types.StorageStatistic
+	LocalStorage   types.StorageStatistic
+	NetworkStorage map[string]types.StorageStatistic
+}
+
 type BkProcessor struct {
 	YaDProcessor                   *yadiskoperate.YaDProcessor
 	haApi                          *haoperate.HaApiClient
 	remoteMaximumFilesQuantity     int
 	enabledNetworkStorages         map[string]struct{}
 	enableUploadFromNetworkStorage bool
+	statisticMu                    sync.RWMutex
+	statistic                      Statistic
+	isStatisticValid               bool
 	logger                         *mylogger.Logger
 }
 
@@ -38,6 +48,7 @@ func NewBkProcessor(yaDP *yadiskoperate.YaDProcessor, haApi *haoperate.HaApiClie
 		enableUploadFromNetworkStorage: enableUploadFromNetworkStorage,
 		enabledNetworkStorages:         m,
 		logger:                         logger,
+		isStatisticValid:               false,
 	}
 }
 
@@ -172,4 +183,71 @@ func (bkp *BkProcessor) DeleteFiles(files []types.ForDeleteFileInfo) (ProcessedF
 			Error:         errorDeleted,
 			ProcessedSize: processedSize},
 		err
+}
+
+func (bkp *BkProcessor) GetStatistic() (Statistic, error) {
+	bkp.statisticMu.RLock()
+	defer bkp.statisticMu.RUnlock()
+
+	if bkp.isStatisticValid {
+		return bkp.statistic, nil
+	}
+
+	bkp.statisticMu.RUnlock()
+	bkp.UpdateStatistic()
+	bkp.statisticMu.RLock()
+	return bkp.statistic, nil
+}
+
+func (bkp *BkProcessor) EnsureStatistic() error {
+	if !bkp.isStatisticValid {
+		_, err := bkp.UpdateStatistic()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (bkp *BkProcessor) InvalidateStatistic() {
+	bkp.statisticMu.Lock()
+	defer bkp.statisticMu.Unlock()
+	bkp.isStatisticValid = false
+}
+
+func (bkp *BkProcessor) UpdateStatistic() (Statistic, error) {
+	bkp.statisticMu.Lock()
+	defer bkp.statisticMu.Unlock()
+	isError := false
+	result := Statistic{
+		YaDisk:         types.StorageStatistic{FileAmount: -1, FilesSize: 0, FreeSpace: 0},
+		LocalStorage:   types.StorageStatistic{FileAmount: -1, FilesSize: 0, FreeSpace: 0},
+		NetworkStorage: make(map[string]types.StorageStatistic),
+	}
+
+	statistic, err := bkp.YaDProcessor.GetStorageStatistic()
+	if err != nil {
+		bkp.logger.ErrorLog.Printf("Error get yandex disc statistic %s", err)
+		isError = true
+
+	} else {
+		result.YaDisk = statistic
+	}
+
+	localHaStorageStatistic, err := bkp.haApi.GetStorageStatistic()
+	if err != nil {
+		bkp.logger.ErrorLog.Printf("Error get yandex disc statistic %s", err)
+		localHaStorageStatistic = make(map[string]types.StorageStatistic)
+		isError = true
+	}
+	if ls, ok := localHaStorageStatistic["local"]; ok {
+		result.LocalStorage = ls
+	}
+
+	delete(localHaStorageStatistic, "local")
+	result.NetworkStorage = localHaStorageStatistic
+	bkp.statistic = result
+	bkp.isStatisticValid = !isError
+	return result, nil
 }

@@ -22,6 +22,7 @@ const (
 	CoreBaseURL         string = "http://supervisor/core/api"
 	AddonsBaseURL       string = "http://supervisor/addons"
 	BackupBaseURL       string = "http://supervisor/backups"
+	HostBaseURL         string = "http://supervisor/host"
 	EntityIdPrefix      string = "sensor."
 	DefaultEntityId     string = "yandex_backup_state"
 	localEntityCopyPath string = "/data/entity-copy.json"
@@ -106,6 +107,21 @@ type getAddonsResult struct {
 // CustomTime - пользовательский тип, оборачивающий time.Time
 type CustomTime struct {
 	time.Time
+}
+
+type getHostInfoResult struct {
+	Result string    `json:"result"`
+	Data   *HostInfo `json:"data"`
+}
+type HostInfo struct {
+	DiskTotal float64 `json:"disk_total"`
+	DiskUsed  float64 `json:"disk_used"`
+	DiskFree  float64 `json:"disk_free"`
+}
+
+type FileStatistic struct {
+	FilesSize  types.FileSize
+	FileAmount int
 }
 
 // MarshalJSON - пользовательская сериализация для CustomTime
@@ -300,6 +316,85 @@ func (haApi *HaApiClient) GetBackupInformation(slug string) (*HaBackupInfo, erro
 	return &result.HaBackupInformation, nil
 }
 
+func (haApi *HaApiClient) GetHostInformation() (*HostInfo, error) {
+	haApi.logger.DebugLog.Println("Get backup slugs request")
+	url := fmt.Sprintf("%s/info", HostBaseURL)
+	var result getHostInfoResult
+
+	err := haApi.getRequest(url, &result)
+
+	if err != nil {
+		resultError := fmt.Errorf("error when get host information: %v", err)
+		return nil, resultError
+	}
+
+	return result.Data, nil
+}
+
+func (haApi *HaApiClient) GetStorageStatistic() (map[string]types.StorageStatistic, error) {
+	info, err := haApi.GetHostInformation()
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error when get host info. %v", err)
+	}
+
+	fileStatistics, err := haApi.GetFileStatistic()
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error when get amount files. %v", err)
+	}
+
+	result := make(map[string]types.StorageStatistic)
+
+	for k, v := range fileStatistics {
+		if k == "local" {
+			//result["local"] = types.StorageStatistic{FreeSpace: types.FileSize(math.Round(info.DiskFree) * types.MiB),
+			//result["local"] = types.StorageStatistic{FreeSpace: types.FileSize(math.Round(info.DiskFree) * 1024 * 1024),
+			result["local"] = types.StorageStatistic{FreeSpace: types.GiBToFileSize(info.DiskFree),
+				FilesSize:  v.FilesSize,
+				FileAmount: v.FileAmount}
+		} else {
+			result[k] = types.StorageStatistic{FreeSpace: -1,
+				FilesSize:  v.FilesSize,
+				FileAmount: v.FileAmount}
+		}
+	}
+	return result, nil
+}
+
+func (haApi *HaApiClient) GetFileStatistic() (map[string]*FileStatistic, error) {
+	slugs, err := haApi.GetBackupSlugsList()
+	if err != nil {
+		haApi.logger.ErrorLog.Printf("Error when get slugs. %v", err)
+		return nil, err
+	}
+
+	result := make(map[string]*FileStatistic)
+
+	for _, slug := range slugs.Backups {
+
+		information, err := haApi.GetBackupInformation(slug.Slug)
+		if err != nil {
+			haApi.logger.ErrorLog.Printf("Error when get information about slug %v. %v", slug.Slug, err)
+			return nil, err
+		}
+
+		key := "local"
+
+		if information.Location != "" {
+			key = information.Location
+		}
+
+		if v, exists := result[key]; exists {
+			v.FileAmount++
+			v.FilesSize += types.FileSize(information.Size)
+		} else {
+			result[key] = &FileStatistic{FileAmount: 1, FilesSize: types.FileSize(information.Size)}
+		}
+	}
+
+	return result, nil
+
+}
+
 func (haApi *HaApiClient) DeleteBackup(slug string) error {
 	haApi.logger.DebugLog.Println("Delete backup request")
 	url := fmt.Sprintf("%s/%s", BackupBaseURL, slug)
@@ -418,7 +513,7 @@ func (haApi *HaApiClient) innerRequest(method string, url string, expectedStatus
 		return resultError
 	}
 
-	//haApi.logger.DebugLog.Printf("*** Result body: %s", string(body))
+	//haApi.logger.ErrorLog.Printf("*** Result body: %s", string(body))
 
 	// Декодируем JSON-ответ
 	if err := json.Unmarshal(body, result); err != nil {

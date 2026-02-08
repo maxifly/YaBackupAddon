@@ -1,4 +1,8 @@
 # Changelog
+## 2.01.5
+
+- Add disc statistic.  [#31](https://github.com/maxifly/YaBackupAddon/issues/31)
+
 ## 2.01.4
 
 - Add NAS name to modal window.  [#26](https://github.com/maxifly/YaBackupAddon/issues/26)

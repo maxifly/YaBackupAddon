@@ -21,6 +21,7 @@ const FILE_PATH_OPTIONS = "/data/options.json"
 const restoreStateEntityInterval time.Duration = 1800
 const restoreStateEntitySchedule = "*/30 * * * * *"
 const clearTaskSchedule = "0 0 */6 * * *"
+const updateStatisticSchedule = "0 0 */6 * * *"
 const operationHourDelta = 6
 const oldTemporaryFileDayDelta = 6
 
@@ -29,6 +30,7 @@ type YbgApp struct {
 	restObj          *rest.Rest
 	haApi            *haoperate.HaApiClient
 	operationManager *om.OperationManager
+	bkProcessor      *bkoperate.BkProcessor
 	logger           *mylogger.Logger
 	scheduleLogLevel gocron.LogLevel
 	scheduler        gocron.Scheduler
@@ -125,6 +127,7 @@ func NewYbg(port string) *YbgApp {
 		logger:           logger,
 		restObj:          restObj,
 		haApi:            haApi,
+		bkProcessor:      bkP,
 		operationManager: operationManager}
 }
 
@@ -198,9 +201,31 @@ func (app *YbgApp) Start() {
 	)
 
 	if err != nil {
-		app.logger.ErrorLog.Printf("Error when create restore state entity task job. %v", err)
+		app.logger.ErrorLog.Printf("Error when create clear temporary data job. %v", err)
 	}
-	app.logger.InfoLog.Printf("Add restore state entity job for to %s schedule (cron with seconds!!!)", restoreStateEntitySchedule)
+	app.logger.InfoLog.Printf("Add clear temporary data job for to %s schedule (cron with seconds!!!)", clearTaskSchedule)
+
+	// Update statistic task
+	_, err = app.scheduler.NewJob(
+		gocron.CronJob(
+			// standard cron tab parsing
+			updateStatisticSchedule,
+			true,
+		),
+		gocron.NewTask(
+			func() {
+				err := app.bkProcessor.EnsureStatistic()
+				if err != nil {
+					app.logger.ErrorLog.Printf("Error when ensure statistic. %v", err)
+				}
+			},
+		),
+	)
+
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when create ensure statistic job. %v", err)
+	}
+	app.logger.InfoLog.Printf("Add ensure statistic job for to %s schedule (cron with seconds!!!)", updateStatisticSchedule)
 
 	// Запуск планировщика в отдельной горутине
 	go func() {
@@ -219,6 +244,8 @@ func (app *YbgApp) Start() {
 
 	await(restoreEntityTask, app.logger, restoreStateEntityInterval)
 
+	go app.updateStatistic()
+
 	list, err := app.haApi.GetAddonList()
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error read addons %v", err)
@@ -232,6 +259,12 @@ func (app *YbgApp) Start() {
 
 func (app *YbgApp) Stop() {
 	_ = app.scheduler.Shutdown()
+}
+func (app *YbgApp) updateStatistic() {
+	_, err := app.bkProcessor.UpdateStatistic()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when update statistic. %v", err)
+	}
 }
 
 func await(task func() bool,

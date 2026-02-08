@@ -7,6 +7,9 @@ import (
 )
 
 const MiB = float64(1 << 20)
+const GiB = float64(1 << 30)
+const iMiB = 1 << 20
+const iGiB = 1 << 30
 const PUT = "PUT"
 const POST = "POST"
 
@@ -15,8 +18,18 @@ var currentLocation *time.Location = time.Now().Location()
 type FileSize int64
 type FileModified time.Time
 
+func MiBToFileSize(mb float64) FileSize {
+	return FileSize(mb * iMiB)
+}
+func GiBToFileSize(mb float64) FileSize {
+	return FileSize(mb * iGiB)
+}
+
 func (fs FileSize) Convert2MbString() string {
 	return fmt.Sprintf("%.2f", float64(fs)/MiB)
+}
+func (fs FileSize) Convert2GbString() string {
+	return fmt.Sprintf("%.2f", float64(fs)/GiB)
 }
 
 func (fm FileModified) Convert2String() string {
