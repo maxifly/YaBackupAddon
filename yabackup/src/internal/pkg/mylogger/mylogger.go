@@ -1,6 +1,9 @@
 package mylogger
 
-import "log"
+import (
+	"encoding/json"
+	"log"
+)
 
 type Logger struct {
 	ErrorLog     *log.Logger
@@ -26,4 +29,13 @@ func (app *Logger) DisableDebug() {
 
 func (app *Logger) IsDebugEnabled() bool {
 	return app.debugEnabled
+}
+
+func (app *Logger) LogStruct(format string, s any, logger *log.Logger) {
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		app.ErrorLog.Printf("Error: %v", err)
+		return
+	}
+	logger.Printf(format, data)
 }

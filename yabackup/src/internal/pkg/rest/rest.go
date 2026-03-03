@@ -37,16 +37,18 @@ type GetTokenResponse struct {
 }
 
 type Rest struct {
-	logger           *mylogger.Logger
-	operationManager *om.OperationManager
-	TokenInfo        types.TokenInfo
-	yaDProcessor     *yadiskoperate.YaDProcessor
-	bKProcessor      *bkoperate.BkProcessor
-	haApi            *haoperate.HaApiClient
-	router           *mux.Router
-	port             string
-	theme            string
-	icons            map[string]string
+	logger                          *mylogger.Logger
+	operationManager                *om.OperationManager
+	TokenInfo                       types.TokenInfo
+	yaDProcessor                    *yadiskoperate.YaDProcessor
+	bKProcessor                     *bkoperate.BkProcessor
+	haApi                           *haoperate.HaApiClient
+	router                          *mux.Router
+	port                            string
+	theme                           string
+	createBackupBeforeUpload        bool
+	localMinimumAmountFreeDiskSpace types.FileSize
+	icons                           map[string]string
 }
 
 func NewRest(port string,
@@ -55,20 +57,24 @@ func NewRest(port string,
 	haApi *haoperate.HaApiClient,
 	theme string,
 	operationManager *om.OperationManager,
+	createBackupBeforeUpload bool,
+	localMinimumAmountFreeDiskSpaceMb int,
 	logger *mylogger.Logger) (*Rest, error) {
 
 	router := mux.NewRouter()
 	fileServer := http.FileServer(http.Dir("./internal/pkg/rest/ui/static/"))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", fileServer))
 	restObj := Rest{port: port,
-		yaDProcessor:     yaDProcessor,
-		bKProcessor:      bKProcessor,
-		haApi:            haApi,
-		theme:            theme,
-		router:           router,
-		logger:           logger,
-		operationManager: operationManager,
-		icons:            make(map[string]string)}
+		yaDProcessor:                    yaDProcessor,
+		bKProcessor:                     bKProcessor,
+		haApi:                           haApi,
+		theme:                           theme,
+		router:                          router,
+		logger:                          logger,
+		operationManager:                operationManager,
+		createBackupBeforeUpload:        createBackupBeforeUpload,
+		localMinimumAmountFreeDiskSpace: types.MiBToFileSize(float64(localMinimumAmountFreeDiskSpaceMb)),
+		icons:                           make(map[string]string)}
 
 	router.HandleFunc("/", restObj.indexHandler).Methods("GET")
 	router.HandleFunc("/index", restObj.indexHandler).Methods("GET")
@@ -76,11 +82,15 @@ func NewRest(port string,
 	router.HandleFunc("/get_token", restObj.getToken).Methods("POST")
 	router.HandleFunc("/start_upload", restObj.startUpload).Methods("GET")
 	router.HandleFunc("/upload1", restObj.upload1).Methods("GET")
+	router.HandleFunc("/create-backup-1", restObj.createBackup1).Methods("GET")
 	router.HandleFunc("/download/{fileName}", restObj.downloadFile).Methods("GET")
 	router.HandleFunc("/operation/status/all", restObj.allOperationStatus).Methods("GET")
 	router.HandleFunc("/load-to-ha/{fileName}", restObj.uploadFileToHa).Methods("POST")
 	router.HandleFunc("/delete-from-yd/{fileName}", restObj.deleteFromYd).Methods("DELETE")
 	router.HandleFunc("/delete-from-ha/{slug}", restObj.deleteFromHa).Methods("DELETE")
+	//router.HandleFunc("/backup/create", restObj.createBackup).Methods("GET")
+	router.HandleFunc("/backup-create", restObj.createBackup).Methods("GET")
+	router.HandleFunc("/backup/delete", restObj.deleteBackup).Methods("GET")
 
 	router.HandleFunc("/{path1}/{path2}/{path3}", restObj.notFoundHandler)
 	router.HandleFunc("/{path1}/{path2}", restObj.notFoundHandler)
@@ -348,6 +358,54 @@ func (app *Rest) upload1(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, uri+"/", http.StatusSeeOther)
 }
 
+func (app *Rest) createBackup(w http.ResponseWriter, r *http.Request) {
+	app.logger.InfoLog.Println("startCreateBackup")
+	files := []string{
+		"./internal/pkg/rest/ui/html/start_create_backup.html",
+		"./internal/pkg/rest/ui/html/base.html",
+	}
+	ts, err := template.ParseFiles(files...)
+	if err != nil {
+		app.logger.ErrorLog.Println(err.Error())
+		http.Error(w, "Internal Server Error", 500)
+		return
+	}
+
+	alertMessages := make([]AlertMessage, 0)
+	data := GetTokenResponse{CheckCodeUrl: app.yaDProcessor.GetCheckCodeUrl(),
+		AlertMessages: alertMessages,
+		IsDarkTheme:   app.isUseDarkTheme()}
+
+	err = ts.Execute(w, data)
+	if err != nil {
+		app.logger.ErrorLog.Println(err.Error())
+		http.Error(w, "Internal Server Error", 500)
+	}
+}
+
+func (app *Rest) createBackup1(w http.ResponseWriter, r *http.Request) {
+	app.logger.InfoLog.Println("createBackup1")
+	_, err := app.bKProcessor.CreateFullBackupSync()
+	if err != nil {
+		app.logger.ErrorLog.Println("Error create backup %s", err)
+	}
+	uri := r.Header.Get("X-Ingress-Path")
+	http.Redirect(w, r, uri+"/", http.StatusSeeOther)
+}
+
+func (app *Rest) deleteBackup(w http.ResponseWriter, r *http.Request) {
+	//TODO Пробное удаление старых бэкапов
+	app.logger.InfoLog.Println("delete backup")
+	err := app.bKProcessor.DeleteOldLocalFiles()
+	//_, err := app.bKProcessor.CreateFullBackupSync()
+
+	if err != nil {
+		return
+	}
+	uri := r.Header.Get("X-Ingress-Path")
+	http.Redirect(w, r, uri+"/", http.StatusSeeOther)
+}
+
 func (app *Rest) allOperationStatus(w http.ResponseWriter, r *http.Request) {
 	app.logger.DebugLog.Println("allOperationStatus")
 	w.Header().Set("Content-Type", "application/json")
@@ -489,6 +547,47 @@ func innerUploadFile(app *Rest, filename, id string) {
 }
 
 func UploadTask(app *Rest) {
+	// TODO Подумать а не перенести ли в bkProcessor
+
+	if app.createBackupBeforeUpload {
+		createBackupEnabled := true
+		if app.localMinimumAmountFreeDiskSpace > 0 {
+			app.logger.DebugLog.Printf("Start check minimum local space")
+			haStatistic, err := app.bKProcessor.GetHaStatistic()
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error get haStatistic. %s", err)
+				createBackupEnabled = false
+			}
+
+			createBackupEnabled = haStatistic.LocalStorage.FreeSpace > app.localMinimumAmountFreeDiskSpace
+
+			if !createBackupEnabled {
+				app.logger.ErrorLog.Printf("It is not allowed to create a backup. Insufficient disk space. [free space %d, minimum free spase: %d]",
+					haStatistic.LocalStorage.FreeSpace, app.localMinimumAmountFreeDiskSpace)
+			}
+		} else {
+			app.logger.InfoLog.Printf("Check minimum local space disabled")
+		}
+
+		if createBackupEnabled {
+			_, err := app.bKProcessor.CreateFullBackupSync()
+			if err != nil {
+				app.logger.ErrorLog.Printf("Error when create backup sync %v", err)
+			} else {
+				app.logger.InfoLog.Printf("Create backup sync completed")
+			}
+		} else {
+			app.logger.ErrorLog.Printf("Create backup disabled")
+		}
+
+		err := app.bKProcessor.DeleteOldLocalFiles()
+		if err != nil {
+			app.logger.ErrorLog.Printf("Error when delete old backup files %v", err)
+		} else {
+			app.logger.InfoLog.Printf("Delete old backup files completed")
+		}
+	}
+
 	app.yaDProcessor.RefreshTokenIsNeed()
 	filesInfo, err := app.bKProcessor.GetFilesInfo()
 	if err != nil {
@@ -611,7 +710,7 @@ func (app *Rest) downloadFile(w http.ResponseWriter, r *http.Request) {
 
 func (app *Rest) updateStatistic() {
 	app.bKProcessor.InvalidateStatistic()
-	_, err := app.bKProcessor.UpdateStatistic()
+	_, err := app.bKProcessor.UpdateAndGetStatistic()
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error update statistic %s", err)
 	}

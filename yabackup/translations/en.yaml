@@ -30,3 +30,12 @@ configuration:
   entity_id:
     name: entity_id
     description: EntityId containing the state
+  local_maximum_files_quantity:
+    name: local_maximum_files_quantity
+    description: Maximum number backups on HA
+  enable_create_backup_before_upload:
+    name: enable_create_backup_before_upload
+    description: Make new backup before upload files to Yandex.Disk
+  local_minimum_amount_free_disk_space_mb:
+    name: local_minimum_amount_free_disk_space_mb
+    description: Minimum free disk space before creating a backup (in MB). 0 - no check is performed.

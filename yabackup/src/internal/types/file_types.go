@@ -40,6 +40,18 @@ func (fm FileModified) IsZero() bool {
 	return time.Time(fm).IsZero()
 }
 
+func (f FileModified) Before(other FileModified) bool {
+	return time.Time(f).Before(time.Time(other))
+}
+
+func (f FileModified) After(other FileModified) bool {
+	return time.Time(f).After(time.Time(other))
+}
+
+func (f FileModified) Equal(other FileModified) bool {
+	return time.Time(f).Equal(time.Time(other))
+}
+
 type CustomTimeRFC3339Nano struct {
 	time.Time
 }
