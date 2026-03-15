@@ -30,3 +30,12 @@ configuration:
   entity_id:
     name: entity_id
     description: Идентификатор сущности, содержащей состояние
+  local_maximum_files_quantity:
+    name: local_maximum_files_quantity
+    description: Максимальное количество копий в HA
+  enable_create_backup_before_upload:
+    name: enable_create_backup_before_upload
+    description: Делать новую копию перед загрузкой фалов на ЯндексДиск
+  local_minimum_amount_free_disk_space_mb:
+    name: local_minimum_amount_free_disk_space_mb
+    description: Минимальное свободное пространство на диске перед созданием бэкапа (в MB). 0 - проверка не производится.

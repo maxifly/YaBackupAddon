@@ -65,11 +65,7 @@ func (dwn *Downloader) downloadInner(fileURL string,
 	req, err := grab.NewRequest(fileName, fileURL)
 	if err != nil {
 		dwn.logger.ErrorLog.Printf("Error when create request: %v", err)
-		dwn.operationManager.UpdateOperationInfo(id, func(info *om.OperationInfo) {
-			info.Status = fmt.Sprintf("Error when create request: %v", err)
-			info.IsError = true
-			info.IsDone = true
-		})
+		dwn.operationManager.ErrorDone(id, fmt.Sprintf("Error when create request: %v", err))
 		return err
 	}
 

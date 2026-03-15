@@ -22,6 +22,7 @@ const (
 	CoreBaseURL         string = "http://supervisor/core/api"
 	AddonsBaseURL       string = "http://supervisor/addons"
 	BackupBaseURL       string = "http://supervisor/backups"
+	JobBaseURL          string = "http://supervisor/jobs"
 	HostBaseURL         string = "http://supervisor/host"
 	EntityIdPrefix      string = "sensor."
 	DefaultEntityId     string = "yandex_backup_state"
@@ -76,17 +77,21 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 }
 
 type EntityState struct {
-	State            Status
-	OkUpload         int
-	ErrorUpload      int
-	OkDelete         int
-	ErrorDelete      int
-	LocalFiles       int
-	RemoteFiles      int
-	LocalSize        types.FileSize
-	RemoteSize       types.FileSize
-	RemoteFreeSpace  types.FileSize
-	LastUploadedTime CustomTime
+	State                       Status
+	OkUpload                    int
+	ErrorUpload                 int
+	OkDelete                    int
+	ErrorDelete                 int
+	LocalFiles                  int
+	RemoteFiles                 int
+	LocalSize                   types.FileSize
+	RemoteSize                  types.FileSize
+	RemoteFreeSpace             types.FileSize
+	LastUploadedTime            CustomTime
+	LastCreateBackupTime        CustomTime
+	LastCreateBackupErrorTime   CustomTime
+	LastCreateBackupWithError   bool
+	LastCreateBacupErrorMessage string
 }
 
 type Addon struct {
@@ -109,9 +114,13 @@ type CustomTime struct {
 	time.Time
 }
 
+func CustomTimeNow() CustomTime {
+	return CustomTime{Time: time.Now()}
+}
+
 type getHostInfoResult struct {
 	Result string    `json:"result"`
-	Data   *HostInfo `json:"data"`
+	Data   *HostInfo `json:"data,omitempty"`
 }
 type HostInfo struct {
 	DiskTotal float64 `json:"disk_total"`
@@ -122,6 +131,41 @@ type HostInfo struct {
 type FileStatistic struct {
 	FilesSize  types.FileSize
 	FileAmount int
+}
+
+type createFullBacupRequest struct {
+	Name            string `json:"name"`
+	Compressed      bool   `json:"compressed"`
+	Location        string `json:"location"`
+	ExcludeDatabase bool   `json:"homeassistant_exclude_database"`
+	Background      bool   `json:"background"`
+}
+
+type CreateBackupResult struct {
+	Slug string `json:"slug"`
+	Job  string `json:"job_id"`
+}
+
+type CreateBackupResponse struct {
+	Result string              `json:"result"`
+	Data   *CreateBackupResult `json:"data"`
+}
+
+type JobInfo struct {
+	Name      string `json:"name"`      // Name of the job
+	Reference string `json:"reference"` // A unique ID for instance the job is acting on
+	UUID      string `json:"uuid"`      // Unique ID of the job
+	Progress  int    `json:"progress"`  // Progress of the job
+	Stage     string `json:"stage"`     // A name for the stage the job is in
+	Done      bool   `json:"done"`      // Is the job complete
+	Created   string `json:"created"`   // Date and time when job was created in ISO format
+	//ChildJobs []JobInfo    `json:"child_jobs"`  // A list of child jobs started by this one
+	Errors []string `json:"errors"` // A list of errors that occurred during execution
+}
+
+type JobInfoResponse struct {
+	Result string   `json:"result"`
+	Data   *JobInfo `json:"data"`
 }
 
 // MarshalJSON - пользовательская сериализация для CustomTime
@@ -148,16 +192,20 @@ func (c *CustomTime) UnmarshalJSON(data []byte) error {
 // Определяем структуру, соответствующую JSON объекту
 
 type EntityAttributes struct {
-	OkUploadAmount    int        `json:"success_upload_files"`
-	ErrorUploadAmount int        `json:"error_upload_files"`
-	OkDeleteAmount    int        `json:"success_delete_files"`
-	ErrorDeleteAmount int        `json:"error_delete_files"`
-	RemoteFiles       int        `json:"remote_files"`
-	LocalFiles        int        `json:"local_files"`
-	RemoteFileSize    int64      `json:"remote_file_size"`
-	LocalFileSize     int64      `json:"local_file_size"`
-	RemoteFreeSpace   int64      `json:"remote_free_space"`
-	LastUploadTime    CustomTime `json:"last_upload_time"`
+	OkUploadAmount              int        `json:"success_upload_files"`
+	ErrorUploadAmount           int        `json:"error_upload_files"`
+	OkDeleteAmount              int        `json:"success_delete_files"`
+	ErrorDeleteAmount           int        `json:"error_delete_files"`
+	RemoteFiles                 int        `json:"remote_files"`
+	LocalFiles                  int        `json:"local_files"`
+	RemoteFileSize              int64      `json:"remote_file_size"`
+	LocalFileSize               int64      `json:"local_file_size"`
+	RemoteFreeSpace             int64      `json:"remote_free_space"`
+	LastUploadTime              CustomTime `json:"last_upload_time"`
+	LastCreateBackupTime        CustomTime `json:"last_create_backup_time"`
+	LastCreateBackupErrorTime   CustomTime `json:"last_create_backup_error_time"`
+	LastCreateBackupWithError   bool       `json:"last_create_backup_with_error_time"`
+	LastCreateBacupErrorMessage string     `json:"last_create_backup_with_error_message"`
 }
 
 type setEntityStateRequest struct {
@@ -221,6 +269,24 @@ func NewHaApi(entity_id string, ctx context.Context, client *http.Client, token 
 	return &HaApiClient{entity_id: entity_id, ctx: ctx, httpClient: client, token: token, logger: logger}, nil
 }
 
+func (haApi *HaApiClient) SetLastBackupState(withError bool, errorText string) error {
+	state, err := haApi.EnsureEntityState()
+	if err != nil {
+		return err
+	}
+
+	now := CustomTimeNow()
+	state.LastCreateBackupTime = now
+	if !withError {
+		state.LastCreateBackupWithError = false
+		state.LastCreateBacupErrorMessage = ""
+	} else {
+		state.LastCreateBackupErrorTime = now
+		state.LastCreateBacupErrorMessage = errorText
+	}
+	return haApi.innerSetEntityState(*state, true)
+}
+
 func (haApi *HaApiClient) SetEntityState(entityState EntityState) error {
 	return haApi.innerSetEntityState(entityState, true)
 }
@@ -240,7 +306,7 @@ func (haApi *HaApiClient) GetEntityState() (*EntityState, error) {
 	return entityState, nil
 }
 
-func (haApi *HaApiClient) EnsureEntityState() error {
+func (haApi *HaApiClient) EnsureEntityState() (*EntityState, error) {
 	haApi.logger.DebugLog.Printf("Check state entity existence")
 	state, err := haApi.GetEntityState()
 	if err != nil {
@@ -249,14 +315,14 @@ func (haApi *HaApiClient) EnsureEntityState() error {
 
 	if state != nil {
 		haApi.logger.DebugLog.Printf("State entity already exists")
-		return nil
+		return state, nil
 	}
 
 	haApi.logger.DebugLog.Printf("State entity not exists")
 	entityCopy, err := readLocalEntityCopy()
 	if err != nil {
 		haApi.logger.ErrorLog.Printf("Error read current state entity local copy %v", err)
-		return err
+		return nil, err
 	}
 
 	entityStateCopy := NewEntityState(entityCopy.State, entityCopy.Attributes)
@@ -264,12 +330,12 @@ func (haApi *HaApiClient) EnsureEntityState() error {
 	err = haApi.innerSetEntityState(*entityStateCopy, false)
 	if err != nil {
 		haApi.logger.ErrorLog.Printf("Error write state entity from local copy %v", err)
-		return err
+		return nil, err
 	}
 
 	haApi.logger.InfoLog.Printf("State entity restored")
 
-	return nil
+	return entityStateCopy, nil
 
 }
 
@@ -395,6 +461,23 @@ func (haApi *HaApiClient) GetFileStatistic() (map[string]*FileStatistic, error) 
 
 }
 
+func (haApi *HaApiClient) GetJobInfo(jobId string) (*JobInfo, error) {
+	haApi.logger.DebugLog.Println("Get job info request %s", jobId)
+	url := fmt.Sprintf("%s/%s", JobBaseURL, jobId)
+	var result JobInfoResponse
+
+	err := haApi.getRequest(url, &result)
+
+	if err != nil {
+		resultError := fmt.Errorf("error when get job info %s: %v", jobId, err)
+		return nil, resultError
+	}
+
+	haApi.logger.LogStruct("Job info response %s", result, haApi.logger.DebugLog)
+
+	return result.Data, nil
+}
+
 func (haApi *HaApiClient) DeleteBackup(slug string) error {
 	haApi.logger.DebugLog.Println("Delete backup request")
 	url := fmt.Sprintf("%s/%s", BackupBaseURL, slug)
@@ -408,6 +491,29 @@ func (haApi *HaApiClient) DeleteBackup(slug string) error {
 	}
 
 	return nil
+}
+
+func (haApi *HaApiClient) CreateFullBackup(backupName string) (*CreateBackupResult, error) {
+	haApi.logger.DebugLog.Println("Create full backup request")
+	url := fmt.Sprintf("%s/new/full", BackupBaseURL)
+	var result CreateBackupResponse
+
+	body := createFullBacupRequest{
+		Name:            "Full_Y_Backup_" + time.Now().Format(time.DateTime),
+		Compressed:      true,
+		ExcludeDatabase: false,
+		Background:      true,
+	}
+
+	err := haApi.postRequest(url, body, &result)
+
+	if err != nil {
+		resultError := fmt.Errorf("error when create full backup: %v", err)
+		return nil, resultError
+	}
+
+	haApi.logger.LogStruct("Backup response %s", result, haApi.logger.DebugLog)
+	return result.Data, nil
 }
 
 func GetTemporaryFilePath(fileName string) string {
@@ -465,23 +571,45 @@ func (haApi *HaApiClient) DeleteOldTemporaryFiles(days int) error {
 	return nil
 }
 
+func (haApi *HaApiClient) postRequest(url string, body interface{}, result interface{}) error {
+	return haApi.innerRequest("POST", url, http.StatusOK, body, result)
+}
+
 func (haApi *HaApiClient) deleteRequest(url string, result interface{}) error {
-	return haApi.innerRequest("DELETE", url, http.StatusOK, result)
+	return haApi.innerRequest("DELETE", url, http.StatusOK, nil, result)
 }
 
 func (haApi *HaApiClient) getRequest(url string, result interface{}) error {
-	return haApi.innerRequest("GET", url, http.StatusOK, result)
+	return haApi.innerRequest("GET", url, http.StatusOK, nil, result)
 }
 
-func (haApi *HaApiClient) innerRequest(method string, url string, expectedStatus int, result interface{}) error {
-	haApi.logger.DebugLog.Printf("Execute get request %s", url)
+func (haApi *HaApiClient) innerRequest(method string, url string, expectedStatus int, body any, result interface{}) error {
+	haApi.logger.DebugLog.Printf("Execute %s request %s", method, url)
 
-	// Создаем новый HTTP-запрос
-	req, err := http.NewRequest(method, url, nil)
+	// Преобразуем структуру в JSON
+
+	var bodyReader io.Reader
+	if body != nil {
+		jsonData, err := json.Marshal(body)
+		if err != nil {
+			resultError := fmt.Errorf("error when data marshalling: %v", err)
+			haApi.logger.ErrorLog.Println(resultError)
+			return resultError
+		}
+		bodyReader = bytes.NewReader(jsonData) // эффективнее для чтения
+	}
+
+	// Создаём запрос
+	req, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {
-		resultError := fmt.Errorf("error when create request: %v", err)
+		resultError := fmt.Errorf("error when create request: %w", err)
 		haApi.logger.ErrorLog.Println(resultError)
 		return resultError
+	}
+
+	// Устанавливаем заголовок для JSON, если тело было
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	// Устанавливаем заголовок авторизации
@@ -506,17 +634,17 @@ func (haApi *HaApiClient) innerRequest(method string, url string, expectedStatus
 	}
 
 	// Читаем тело ответа
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		resultError := fmt.Errorf("error when read body: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
 		return resultError
 	}
 
-	//haApi.logger.ErrorLog.Printf("*** Result body: %s", string(body))
+	//haApi.logger.ErrorLog.Printf("*** Result body: %s", string(respBody))
 
 	// Декодируем JSON-ответ
-	if err := json.Unmarshal(body, result); err != nil {
+	if err := json.Unmarshal(respBody, result); err != nil {
 		resultError := fmt.Errorf("error when parse body: %v", err)
 		haApi.logger.ErrorLog.Println(resultError)
 		return resultError
@@ -620,16 +748,20 @@ func (haApi *HaApiClient) innerSetEntityState(entityState EntityState, saveLocal
 	data := setEntityStateRequest{
 		State: entityState.State,
 		Attributes: EntityAttributes{
-			OkUploadAmount:    entityState.OkUpload,
-			ErrorUploadAmount: entityState.ErrorUpload,
-			OkDeleteAmount:    entityState.OkDelete,
-			ErrorDeleteAmount: entityState.ErrorDelete,
-			RemoteFiles:       entityState.RemoteFiles,
-			LocalFiles:        entityState.LocalFiles,
-			RemoteFileSize:    int64(entityState.RemoteSize),
-			LocalFileSize:     int64(entityState.LocalSize),
-			RemoteFreeSpace:   int64(entityState.RemoteFreeSpace),
-			LastUploadTime:    entityState.LastUploadedTime,
+			OkUploadAmount:              entityState.OkUpload,
+			ErrorUploadAmount:           entityState.ErrorUpload,
+			OkDeleteAmount:              entityState.OkDelete,
+			ErrorDeleteAmount:           entityState.ErrorDelete,
+			RemoteFiles:                 entityState.RemoteFiles,
+			LocalFiles:                  entityState.LocalFiles,
+			RemoteFileSize:              int64(entityState.RemoteSize),
+			LocalFileSize:               int64(entityState.LocalSize),
+			RemoteFreeSpace:             int64(entityState.RemoteFreeSpace),
+			LastUploadTime:              entityState.LastUploadedTime,
+			LastCreateBackupTime:        entityState.LastCreateBackupTime,
+			LastCreateBackupErrorTime:   entityState.LastCreateBackupErrorTime,
+			LastCreateBackupWithError:   entityState.LastCreateBackupWithError,
+			LastCreateBacupErrorMessage: entityState.LastCreateBacupErrorMessage,
 		},
 	}
 
@@ -692,17 +824,21 @@ func (haApi *HaApiClient) innerSetEntityState(entityState EntityState, saveLocal
 
 func NewEntityState(state Status, attributes EntityAttributes) *EntityState {
 	return &EntityState{
-		State:            state,
-		OkUpload:         attributes.OkUploadAmount,
-		ErrorUpload:      attributes.ErrorUploadAmount,
-		OkDelete:         attributes.OkDeleteAmount,
-		ErrorDelete:      attributes.ErrorDeleteAmount,
-		LocalFiles:       attributes.LocalFiles,
-		RemoteFiles:      attributes.RemoteFiles,
-		LocalSize:        types.FileSize(attributes.LocalFileSize),
-		RemoteSize:       types.FileSize(attributes.RemoteFileSize),
-		RemoteFreeSpace:  types.FileSize(attributes.RemoteFreeSpace),
-		LastUploadedTime: attributes.LastUploadTime,
+		State:                       state,
+		OkUpload:                    attributes.OkUploadAmount,
+		ErrorUpload:                 attributes.ErrorUploadAmount,
+		OkDelete:                    attributes.OkDeleteAmount,
+		ErrorDelete:                 attributes.ErrorDeleteAmount,
+		LocalFiles:                  attributes.LocalFiles,
+		RemoteFiles:                 attributes.RemoteFiles,
+		LocalSize:                   types.FileSize(attributes.LocalFileSize),
+		RemoteSize:                  types.FileSize(attributes.RemoteFileSize),
+		RemoteFreeSpace:             types.FileSize(attributes.RemoteFreeSpace),
+		LastUploadedTime:            attributes.LastUploadTime,
+		LastCreateBackupTime:        attributes.LastCreateBackupTime,
+		LastCreateBackupErrorTime:   attributes.LastCreateBackupErrorTime,
+		LastCreateBackupWithError:   attributes.LastCreateBackupWithError,
+		LastCreateBacupErrorMessage: attributes.LastCreateBacupErrorMessage,
 	}
 }
 
