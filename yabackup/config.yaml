@@ -1,6 +1,6 @@
 name: "Yandex backup"
 description: "Copy HA backup to YandexDisk"
-version: "2.01.4"
+version: "2.02.0"
 slug: "yabackup"
 url: "https://github.com/maxifly/YaBackupAddon/tree/main/yabackup"
 image: "ghcr.io/maxifly/yabackupaddon/yabackup-{arch}"
@@ -29,6 +29,9 @@ options:
   enabled_network_storages: []
   log_level: INFO
   theme: Light
+  enable_create_backup_before_upload: false
+  local_maximum_files_quantity: 5
+  local_minimum_amount_free_disk_space_mb: 1024
 
 schema:
   client_id: str
@@ -42,5 +45,9 @@ schema:
   log_level: "list(DEBUG|INFO|WARNING|ERROR)"
   theme: "list(Light|Dark)"
   entity_id: "str?"
+  enable_create_backup_before_upload: bool
+  local_maximum_files_quantity: "int(0,)"
+  local_minimum_amount_free_disk_space_mb: "int(0,)"
+
 
 ingress: true

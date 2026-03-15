@@ -121,7 +121,9 @@ func (app *YaDProcessor) GetRemoteFiles() ([]types.RemoteFileInfo, error) {
 	}
 	result := make([]types.RemoteFileInfo, 0)
 
-	resource, err := (*app.yaDisk).GetResource(app.remotePath, make([]string, 0), 10000, 0, false, "0", "name")
+	resource, err := (*app.yaDisk).GetResource(app.remotePath,
+		[]string{"_embedded.items.type", "_embedded.items.name", "_embedded.items.size", "_embedded.items.modified"},
+		10000, 0, false, "0", "name")
 	if err != nil {
 		app.logger.ErrorLog.Printf("Error when get remote files from path %s. %v", app.remotePath, err)
 		return result, err
@@ -276,4 +278,53 @@ func (app *YaDProcessor) GetDiskInfo() (types.DiskInfo, error) {
 		TotalSpace: types.FileSize(diskInfo.TotalSpace)}
 	app.logger.DebugLog.Printf("Get disk info. %v", err)
 	return result, nil
+}
+
+func (app *YaDProcessor) GetFilesStatistic() (int, types.FileSize, error) {
+	app.logger.DebugLog.Printf("Get amount files in %v", app.remotePath)
+	if app.yaDisk == nil {
+		return 0, 0, fmt.Errorf("YandexDisk object is nil")
+	}
+
+	resource, err := (*app.yaDisk).GetResource(app.remotePath,
+		[]string{"_embedded.total", "_embedded.items.size", "_embedded.items.type"},
+		10000, 0, false, "0", "name")
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when get amount  remote files from path %s. %v", app.remotePath, err)
+		return 0, 0, err
+	}
+
+	app.logger.DebugLog.Printf("Found %d remote items", len(resource.Embedded.Items))
+
+	resultSize := types.FileSize(0)
+	for _, item := range resource.Embedded.Items {
+		if item.Type != itemTypeFile {
+			continue
+		}
+
+		resultSize += types.FileSize(item.Size)
+	}
+
+	app.logger.DebugLog.Printf("Amount remote files: %d", resource.Embedded.Total)
+
+	return resource.Embedded.Total, resultSize, nil
+
+}
+
+func (app *YaDProcessor) GetStorageStatistic() (types.StorageStatistic, error) {
+	statistic := types.StorageStatistic{FreeSpace: 0, FilesSize: 0, FileAmount: 0}
+	info, err := app.GetDiskInfo()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when get remote disk info. %v", err)
+	}
+
+	amount, fileSize, err := app.GetFilesStatistic()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when get amount files. %v", err)
+	}
+
+	statistic.FileAmount = amount
+	statistic.FilesSize = fileSize
+	statistic.FreeSpace = info.TotalSpace - info.UsedSpace
+	return statistic, nil
 }

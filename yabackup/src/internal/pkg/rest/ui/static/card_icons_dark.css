@@ -49,6 +49,17 @@
     content: url("clock-out-dark.png");
 }
 
+.icon.ydisk {
+    content: url("yandex-disk.png");
+}
+
+.icon.ha-color {
+    content: url("ha-color.png");
+}
+
+.icon.nas-color {
+    content: url("nas-color.png");
+}
 
 .icon.database.hidden {
     visibility: hidden

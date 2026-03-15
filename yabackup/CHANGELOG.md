@@ -1,4 +1,9 @@
 # Changelog
+## 2.02.0
+
+- Add disc statistic.  [#31](https://github.com/maxifly/YaBackupAddon/issues/31)
+- Create local backup before upload (if feature turn on).  [#35](https://github.com/maxifly/YaBackupAddon/issues/35)
+
 ## 2.01.4
 
 - Add NAS name to modal window.  [#26](https://github.com/maxifly/YaBackupAddon/issues/26)

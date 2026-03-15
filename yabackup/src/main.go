@@ -1,7 +1,10 @@
 package main
 
 import (
+	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"ybg/internal/appybg"
 )
 
@@ -13,7 +16,18 @@ func main() {
 
 	app := appybg.NewYbg(port)
 
-	defer app.Stop()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	app.Start()
+	go func() {
+		app.Start()
+	}()
+
+	// Ждем сигнала остановки
+	<-sigChan
+	log.Println("Signal stop resieved")
+
+	// Вызываем Stop() вручную (defer в main может не сработать при SIGKILL)
+	app.Stop()
+
 }

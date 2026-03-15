@@ -1,5 +1,5 @@
 {{template "base" .}}
-{{define "title"}}<h1>Backups</h1>{{end}}
+
 {{define "scripts"}}
 <!-- Модальное окно окнчания операции-->
 <div class="modal fade" id="completionModal" tabindex="-1" aria-labelledby="completionModalLabel" aria-hidden="true">
@@ -159,8 +159,74 @@
 
 {{end}}
 
+{{define "title"}}<h1>Backups</h1>{{end}}
 {{define "main"}}
+<div class="col-md-7 border-bottom border-2">
+    <div class="row">
+        <div class="col-md-1 pt-2">
+            <div class="row">
+                <div class="col-md-12 ms-2">
+                    <img class="icon ydisk">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-11 pt-2">
+            <div class="row">
+                <div class="col-md-12">
+                    <span id="ybFiles" class="fw-bolder"> {{.YDStatistic.FileAmount}} ({{.YDStatistic.FilesSize.Convert2GbString}} Gb)</span> in YD
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                  free space: <span id="ybFreeSpace"> {{.YDStatistic.FreeSpace.Convert2GbString}} Gb</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-1 pt-2">
+            <div class="row">
+                <div class="col-md-12 ms-2">
+                    <img class="icon ha-color">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-11 pt-2">
+            <div class="row">
+                <div class="col-md-12">
+                    <span id="haFiles" class="fw-bolder"> {{.LocalStatistic.FileAmount}} ({{.LocalStatistic.FilesSize.Convert2GbString}} Gb) in HA</span>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                  free space: <span id="haFreeSpace"> {{.LocalStatistic.FreeSpace.Convert2GbString}} Gb</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
+{{ range $key, $value := .NetworkStatistic }}
+    <div class="row">
+        <div class="col-md-1 pt-2">
+            <div class="row">
+                <div class="col-md-12 ms-2">
+                    <img class="icon nas-color">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-11 pt-2">
+            <div class="row">
+                <div class="col-md-12">
+                    <span class="fw-bolder"> {{$value.FileAmount}} ({{$value.FilesSize.Convert2GbString}} Gb)</span> in {{$key}}
+                </div>
+            </div>
+        </div>
+    </div>
+
+{{end}}
+
+</div>
+<div class="col-md-7 .bg-primary">
 {{range .BFiles}}
 
 <div class="card p-3 backup-card" data-bs-toggle="modal" data-bs-target="#exampleModal"
@@ -269,7 +335,7 @@ data-isNetwork =
 </div>
 
 {{end}}
-
+</div>
 {{end}}
 
 {{define "bottom_scripts"}}
@@ -442,13 +508,13 @@ data-isNetwork =
                     residentCol.className = 'col-md-6 addon';
                     residentCol.innerHTML = `
                             <div class="row">
-                              <div class="col-md-4"> <img class="icon me-2 float-end" src=${getAppIcon(addon.slug)}> </div>
-                              <div class="col-md-8">
+                              <div class="col-md-4 pt-3"> <img class="icon me-2 float-end" src=${getAppIcon(addon.slug)}> </div>
+                              <div class="col-md-8 pt-3">
                                 <div class="row">
                                    <div class="col-md-12">
                                         ${addon.name}
                                    </div>
-                                   <div class="col-md-12">
+                                   <div class="col-md-12 fw-lighter">
                                         v${addon.version}
                                    </div>
                                 </div>

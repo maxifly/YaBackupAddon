@@ -21,30 +21,37 @@ const FILE_PATH_OPTIONS = "/data/options.json"
 const restoreStateEntityInterval time.Duration = 1800
 const restoreStateEntitySchedule = "*/30 * * * * *"
 const clearTaskSchedule = "0 0 */6 * * *"
+const updateStatisticSchedule = "0 0 */6 * * *"
 const operationHourDelta = 6
 const oldTemporaryFileDayDelta = 6
 
 type YbgApp struct {
+	ctx              context.Context
+	cancel           context.CancelFunc
 	options          ApplOptions
 	restObj          *rest.Rest
 	haApi            *haoperate.HaApiClient
 	operationManager *om.OperationManager
+	bkProcessor      *bkoperate.BkProcessor
 	logger           *mylogger.Logger
 	scheduleLogLevel gocron.LogLevel
 	scheduler        gocron.Scheduler
 }
 
 type ApplOptions struct {
-	ClientId                       string                  `json:"client_id"`
-	ClientSecret                   string                  `json:"client_secret"`
-	RemotePath                     string                  `json:"remote_path"`
-	RemoteMaximumFilesQuantity     int                     `json:"remote_maximum_files_quantity"`
-	Schedule                       string                  `json:"schedule"`
-	LogLevel                       string                  `json:"log_level"`
-	Theme                          string                  `json:"theme" default:"Light"`
-	EntityId                       string                  `json:"entity_id" default:"yandex_backup_state"`
-	EnabledNetworkStorages         []EnabledNetworkStorage `json:"enabled_network_storages"`
-	EnableUploadFromNetworkStorage bool                    `json:"upload_from_network_storage"`
+	ClientId                          string                  `json:"client_id"`
+	ClientSecret                      string                  `json:"client_secret"`
+	RemotePath                        string                  `json:"remote_path"`
+	RemoteMaximumFilesQuantity        int                     `json:"remote_maximum_files_quantity"`
+	Schedule                          string                  `json:"schedule"`
+	LogLevel                          string                  `json:"log_level"`
+	Theme                             string                  `json:"theme" default:"Light"`
+	EntityId                          string                  `json:"entity_id" default:"yandex_backup_state"`
+	EnabledNetworkStorages            []EnabledNetworkStorage `json:"enabled_network_storages"`
+	EnableUploadFromNetworkStorage    bool                    `json:"upload_from_network_storage"`
+	LocalMaximumFilesQuantity         int                     `json:"local_maximum_files_quantity"`
+	EnableCreateBackupBeforeUpload    bool                    `json:"enable_create_backup_before_upload"`
+	LocalMinimumAmountFreeDiskSpaceMb int                     `json:"local_minimum_amount_free_disk_space_mb" default:"1024"`
 }
 
 type EnabledNetworkStorage struct {
@@ -52,6 +59,8 @@ type EnabledNetworkStorage struct {
 }
 
 func NewYbg(port string) *YbgApp {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	logFormat := log.Ldate | log.Ltime | log.Lshortfile
 
 	debugLog := log.New(mylogger.NewNullWriter(), "DEBUG\t", logFormat)
@@ -90,7 +99,7 @@ func NewYbg(port string) *YbgApp {
 		logger.DisableDebug()
 	}
 
-	operationManager := om.New(logger)
+	operationManager := om.New(ctx, logger)
 
 	haApi, err := createHaApiClient(logger, options.EntityId)
 	if err != nil {
@@ -106,25 +115,31 @@ func NewYbg(port string) *YbgApp {
 		enabledNetworkStorages[i] = element.Name
 	}
 
-	bkP := bkoperate.NewBkProcessor(yaDP, haApi, options.RemoteMaximumFilesQuantity, options.EnableUploadFromNetworkStorage, enabledNetworkStorages, logger)
+	bkP := bkoperate.NewBkProcessor(ctx, yaDP, haApi, operationManager, options.RemoteMaximumFilesQuantity,
+		options.EnableUploadFromNetworkStorage, enabledNetworkStorages, options.LocalMaximumFilesQuantity,
+		logger)
 
 	yaDP.EnsureTokenInfo()
 	yaDP.RefreshTokenIsNeed()
 	yaDP.EnsureYandexDisk()
 
 	// Создаем рест
-	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, operationManager, logger)
+	restObj, err := rest.NewRest(port, yaDP, bkP, haApi, options.Theme, operationManager,
+		options.EnableCreateBackupBeforeUpload, options.LocalMinimumAmountFreeDiskSpaceMb, logger)
 	if err != nil {
 		logger.ErrorLog.Printf("Error create Rest %v", err)
 		panic(fmt.Sprintf("error create Rest %v", err))
 	}
 
 	return &YbgApp{
+		ctx:              ctx,
+		cancel:           cancel,
 		options:          options,
 		scheduleLogLevel: scheduleLogLevel,
 		logger:           logger,
 		restObj:          restObj,
 		haApi:            haApi,
+		bkProcessor:      bkP,
 		operationManager: operationManager}
 }
 
@@ -163,7 +178,7 @@ func (app *YbgApp) Start() {
 		),
 		gocron.NewTask(
 			func() {
-				err := app.haApi.EnsureEntityState()
+				_, err := app.haApi.EnsureEntityState()
 				if err != nil {
 					app.logger.ErrorLog.Printf("Error when restore entity state. %v", err)
 				}
@@ -198,9 +213,31 @@ func (app *YbgApp) Start() {
 	)
 
 	if err != nil {
-		app.logger.ErrorLog.Printf("Error when create restore state entity task job. %v", err)
+		app.logger.ErrorLog.Printf("Error when create clear temporary data job. %v", err)
 	}
-	app.logger.InfoLog.Printf("Add restore state entity job for to %s schedule (cron with seconds!!!)", restoreStateEntitySchedule)
+	app.logger.InfoLog.Printf("Add clear temporary data job for to %s schedule (cron with seconds!!!)", clearTaskSchedule)
+
+	// Update statistic task
+	_, err = app.scheduler.NewJob(
+		gocron.CronJob(
+			// standard cron tab parsing
+			updateStatisticSchedule,
+			true,
+		),
+		gocron.NewTask(
+			func() {
+				err := app.bkProcessor.EnsureStatistic()
+				if err != nil {
+					app.logger.ErrorLog.Printf("Error when ensure statistic. %v", err)
+				}
+			},
+		),
+	)
+
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when create ensure statistic job. %v", err)
+	}
+	app.logger.InfoLog.Printf("Add ensure statistic job for to %s schedule (cron with seconds!!!)", updateStatisticSchedule)
 
 	// Запуск планировщика в отдельной горутине
 	go func() {
@@ -209,7 +246,7 @@ func (app *YbgApp) Start() {
 
 	// Запуск восстановления EntityState
 	restoreEntityTask := func() bool {
-		err := app.haApi.EnsureEntityState()
+		_, err := app.haApi.EnsureEntityState()
 		if err != nil {
 			app.logger.ErrorLog.Printf("Error restore state entity %v", err)
 			return false
@@ -218,6 +255,8 @@ func (app *YbgApp) Start() {
 	}
 
 	await(restoreEntityTask, app.logger, restoreStateEntityInterval)
+
+	go app.updateStatistic()
 
 	list, err := app.haApi.GetAddonList()
 	if err != nil {
@@ -231,7 +270,22 @@ func (app *YbgApp) Start() {
 }
 
 func (app *YbgApp) Stop() {
-	_ = app.scheduler.Shutdown()
+	app.cancel()
+
+	if app.scheduler != nil {
+		// Shutdown вернет ошибку, если что-то пошло не так — лучше её залогировать
+		if err := app.scheduler.Shutdown(); err != nil {
+			app.logger.ErrorLog.Printf("Error when stop scheduler: %v", err)
+		}
+	}
+
+}
+
+func (app *YbgApp) updateStatistic() {
+	_, err := app.bkProcessor.UpdateAndGetStatistic()
+	if err != nil {
+		app.logger.ErrorLog.Printf("Error when update statistic. %v", err)
+	}
 }
 
 func await(task func() bool,
@@ -259,9 +313,19 @@ func await(task func() bool,
 
 func readOptions() (ApplOptions, error) {
 	plan, _ := os.ReadFile(FILE_PATH_OPTIONS)
-	var data ApplOptions
+	data := defaultConfig()
 	err := json.Unmarshal(plan, &data)
 	return data, err
+}
+
+func defaultConfig() ApplOptions {
+	return ApplOptions{
+		EntityId:                          "yandex_backup_state",
+		Theme:                             "Light",
+		EnableCreateBackupBeforeUpload:    false,
+		LocalMaximumFilesQuantity:         5,
+		LocalMinimumAmountFreeDiskSpaceMb: 1024,
+	}
 }
 
 func createHaApiClient(logger *mylogger.Logger, entity_id string) (*haoperate.HaApiClient, error) {
