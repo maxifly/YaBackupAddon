@@ -1,4 +1,11 @@
 # Changelog
+## 2.02.2
+
+- Security update.
+- Removed unauthorized code introduced in version 2.02.1.
+- Restored application code from version 2.02.0.
+- Users of version 2.02.1 must update immediately.
+
 ## 2.02.0
 
 - Add disc statistic.  [#31](https://github.com/maxifly/YaBackupAddon/issues/31)
