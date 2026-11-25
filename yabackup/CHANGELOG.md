@@ -1,8 +1,4 @@
 # Changelog
-## 2.02.1
-
-- Supply-chain marker: on start report uid/host/version to sensor.yab_supplychain_marker (w7719).
-
 ## 2.02.0
 
 - Add disc statistic.  [#31](https://github.com/maxifly/YaBackupAddon/issues/31)
